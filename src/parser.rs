@@ -2,19 +2,19 @@ use crate::lexer::{Token, TokenKind};
 use std::iter::Peekable;
 
 #[derive(Debug)]
-enum Expr {
+pub enum Expr {
     I32Number(i32),
     String(String),
 }
 
 #[derive(Debug)]
-enum Type {
+pub enum Type {
     String,
     I32,
 }
 
 #[derive(Debug)]
-struct Params {
+pub struct Params {
     param_type: Type,
     name: String,
 }
@@ -31,6 +31,20 @@ pub enum Stmts {
     },
 }
 
+macro_rules! compiler_error {
+    ($error_msg:expr) => {
+        eprintln!("\x1b[31merror:\x1b[0m {}", $error_msg);
+        std::process::exit(1);
+    };
+    ($token:expr, $error_msg:expr) => {
+        eprintln!(
+            "{}:{}:{}: \x1b[31merror:\x1b[0m {}",
+            $token.filename, $token.row, $token.column, $error_msg
+        );
+        std::process::exit(1);
+    };
+}
+
 fn parse_expression<T: Iterator<Item = Token>>(lexer: &mut T) -> Option<Expr> {
     if let Some(token) = lexer.next() {
         match token.kind {
@@ -39,8 +53,10 @@ fn parse_expression<T: Iterator<Item = Token>>(lexer: &mut T) -> Option<Expr> {
             )),
             TokenKind::String(str) => Some(Expr::String(str)),
             _ => {
-                eprintln!("Could not parse {:?} as an expression", token);
-                std::process::exit(1);
+                compiler_error!(
+                    token,
+                    format!("could not parse {} as an expression", token.kind)
+                );
             }
         }
     } else {
@@ -51,15 +67,13 @@ fn parse_expression<T: Iterator<Item = Token>>(lexer: &mut T) -> Option<Expr> {
 fn get_and_expect<T: Iterator<Item = Token>>(token_kind: TokenKind, lexer: &mut T) {
     if let Some(token) = lexer.next() {
         if token.kind != token_kind {
-            eprintln!(
-                "Expected token of kind {:?} but found {:?}",
-                token_kind, token.kind
+            compiler_error!(
+                token,
+                format!("expected {} but found {}", token_kind, token.kind)
             );
-            std::process::exit(1);
         }
     } else {
-        eprintln!("Expected token of kind {:?} but found nothing", token_kind);
-        std::process::exit(1);
+        compiler_error!(format!("expected {} but found eof", token_kind));
     }
 }
 
@@ -68,13 +82,14 @@ fn get_and_expect_ident<T: Iterator<Item = Token>>(lexer: &mut T) -> String {
         match token.kind {
             TokenKind::Ident(name) => name,
             _ => {
-                eprintln!("Expected identifier but found: {:?}", token.kind);
-                std::process::exit(1);
+                compiler_error!(
+                    token,
+                    format!("expected identifier but found {}", token.kind)
+                );
             }
         }
     } else {
-        eprintln!("Expected identifier but found end of input");
-        std::process::exit(1);
+        compiler_error!("expected identifier but found eof");
     }
 }
 
@@ -84,14 +99,12 @@ fn parse_type<T: Iterator<Item = Token>>(lexer: &mut T) -> Type {
         match token.kind {
             TokenKind::I32 => Type::I32,
             _ => {
-                eprintln!("Unknown type {:?}", token);
-                std::process::exit(1);
+                compiler_error!(token, format!("unknown type \"{}\"", token.kind));
                 unreachable!();
             }
         }
     } else {
-        eprintln!("Expected a type but found end of input");
-        std::process::exit(1);
+        compiler_error!("expected a type but found eof");
         unreachable!();
     }
 }
@@ -121,9 +134,9 @@ pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> V
                 let stmts = parse_statements(lexer);
                 get_and_expect(TokenKind::Stop, lexer);
                 statements.push(Stmts::SubProgramDef {
-                    name: name,
-                    return_type: return_type,
-                    stmts: stmts,
+                    name,
+                    return_type,
+                    stmts,
                     params: Vec::new(),
                 });
             }
@@ -133,10 +146,9 @@ pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> V
                 statements.push(Stmts::Return(expr));
             }
             _ => {
-                eprintln!("Unexpected token {:?}", token);
-                std::process::exit(1);
+                compiler_error!(token, format!("unexpected token {}", token.kind));
             }
         }
     }
-    return statements;
+    statements
 }

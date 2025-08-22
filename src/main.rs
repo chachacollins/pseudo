@@ -15,7 +15,7 @@ fn main() {
     let source = fs::read_to_string(file_name)
         .map_err(|err| eprintln!("Could not open file: {file_name} because of {}", err))
         .unwrap();
-    let lexer = Lexer::new(source);
+    let lexer = Lexer::new(file_name.to_string(), source);
     let stmts = parser::parse_statements(&mut lexer.peekable());
     for stmt in stmts {
         println!("{:?}", stmt);

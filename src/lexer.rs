@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(PartialEq, Debug)]
 pub enum TokenKind {
     Colon,
@@ -17,43 +19,72 @@ pub enum TokenKind {
     Illegal,
 }
 
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenKind::Colon => write!(f, ":"),
+            TokenKind::LParen => write!(f, "("),
+            TokenKind::RParen => write!(f, ")"),
+            TokenKind::Semicolon => write!(f, ";"),
+            TokenKind::Func => write!(f, "func"),
+            TokenKind::Start => write!(f, "start"),
+            TokenKind::Stop => write!(f, "stop"),
+            TokenKind::Write => write!(f, "write"),
+            TokenKind::Return => write!(f, "return"),
+            TokenKind::I32 => write!(f, "i32"),
+            TokenKind::Number(num) => write!(f, "number \"{num}\""),
+            TokenKind::String(string) => write!(f, "string \"{string}\""),
+            TokenKind::Ident(string) => write!(f, "identifier \"{string}\""),
+            TokenKind::Eof => write!(f, "eof"),
+            TokenKind::Illegal => write!(f, "illegal"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Token {
     pub kind: TokenKind,
-    line: usize,
+    pub filename: String,
+    pub column: usize,
+    pub row: usize,
 }
 
 pub struct Lexer {
     source: Vec<char>,
     pos: usize,
     read_pos: usize,
-    line: usize,
+    row: usize,
+    column: usize,
+    filename: String,
 }
 
 impl Lexer {
-    pub fn new(source: String) -> Self {
-        return Self {
+    pub fn new(filename: String, source: String) -> Self {
+        Self {
             source: source.chars().collect(),
-            line: 1,
+            column: 0,
+            row: 1,
             pos: 0,
             read_pos: 0,
-        };
+            filename,
+        }
     }
 
     fn peek(&self) -> char {
         if self.read_pos >= self.source.len() {
             return '\0';
         }
-        return self.source[self.read_pos];
+        self.source[self.read_pos]
     }
 
     fn advance(&mut self) -> char {
         if self.read_pos >= self.source.len() {
             return '\0';
         }
+        self.column += 1;
         self.pos = self.read_pos;
         self.read_pos += 1;
-        return self.source[self.pos];
+        self.source[self.pos]
     }
 
     fn skip_whitespace(&mut self) {
@@ -64,7 +95,8 @@ impl Lexer {
                     let _ = self.advance();
                 }
                 '\n' => {
-                    self.line += 1;
+                    self.column = 0;
+                    self.row += 1;
                     let _ = self.advance();
                 }
                 _ => break,
@@ -75,7 +107,9 @@ impl Lexer {
     fn make_token(&self, token_kind: TokenKind) -> Token {
         Token {
             kind: token_kind,
-            line: self.line,
+            column: self.column,
+            row: self.row,
+            filename: self.filename.clone(),
         }
     }
 
