@@ -1,5 +1,5 @@
 #[derive(PartialEq, Debug)]
-enum TokenKind {
+pub enum TokenKind {
     Colon,
     LParen,
     RParen,
@@ -19,7 +19,7 @@ enum TokenKind {
 
 #[derive(Debug)]
 pub struct Token {
-    kind: TokenKind,
+    pub kind: TokenKind,
     line: usize,
 }
 
@@ -110,7 +110,7 @@ impl Lexer {
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut ident = String::new();
                 ident.push(c);
-                while self.peek().is_alphanumeric() {
+                while self.peek().is_alphanumeric() || self.peek() == '_' {
                     ident.push(self.advance());
                 }
                 self.make_token(self.classify_ident(&ident))

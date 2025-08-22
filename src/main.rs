@@ -1,4 +1,5 @@
 mod lexer;
+mod parser;
 
 use lexer::Lexer;
 use std::{env, fs, process};
@@ -15,7 +16,8 @@ fn main() {
         .map_err(|err| eprintln!("Could not open file: {file_name} because of {}", err))
         .unwrap();
     let lexer = Lexer::new(source);
-    for token in lexer {
-        println!("{:?}", token);
+    let stmts = parser::parse_statements(&mut lexer.peekable());
+    for stmt in stmts {
+        println!("{:?}", stmt);
     }
 }
