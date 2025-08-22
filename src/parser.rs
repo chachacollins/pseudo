@@ -14,9 +14,9 @@ pub enum Type {
 }
 
 #[derive(Debug)]
-pub struct Params {
-    param_type: Type,
-    name: String,
+pub struct Param {
+    pub param_type: Type,
+    pub name: String,
 }
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub enum Stmts {
     SubProgramDef {
         name: String,
         return_type: Type,
-        params: Vec<Params>,
+        params: Vec<Param>,
         stmts: Vec<Stmts>,
     },
 }
@@ -48,9 +48,19 @@ macro_rules! compiler_error {
 fn parse_expression<T: Iterator<Item = Token>>(lexer: &mut T) -> Option<Expr> {
     if let Some(token) = lexer.next() {
         match token.kind {
-            TokenKind::Number(num) => Some(Expr::I32Number(
-                num.parse::<i32>().expect("Could not parse i32 number"),
-            )),
+            TokenKind::Number(ref num) => {
+                let num = num
+                    .parse::<i128>()
+                    .expect("Could not parse into i128 number");
+                if num >= i32::MIN as i128 && num <= i32::MAX as i128 {
+                    Some(Expr::I32Number(num as i32))
+                } else {
+                    compiler_error!(
+                        token,
+                        format!("could not parse {} as an i32 number", token.kind)
+                    );
+                }
+            }
             TokenKind::String(str) => Some(Expr::String(str)),
             _ => {
                 compiler_error!(
@@ -109,7 +119,8 @@ fn parse_type<T: Iterator<Item = Token>>(lexer: &mut T) -> Type {
     }
 }
 
-pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Vec<Stmts> {
+pub type Program = Vec<Stmts>;
+pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Program {
     let mut statements = Vec::new();
     while let Some(token) = lexer.peek() {
         if matches!(token.kind, TokenKind::Stop) {

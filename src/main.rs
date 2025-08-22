@@ -1,3 +1,4 @@
+mod codegen;
 mod lexer;
 mod parser;
 
@@ -17,7 +18,7 @@ fn main() {
         .unwrap();
     let lexer = Lexer::new(file_name.to_string(), source);
     let stmts = parser::parse_statements(&mut lexer.peekable());
-    for stmt in stmts {
-        println!("{:?}", stmt);
-    }
+    let code = codegen::generate_stmts(stmts, true).unwrap();
+    let output_filename = format!("{}.c", file_name.splitn(2, '.').collect::<Vec<&str>>()[0]);
+    fs::write(output_filename, code).unwrap();
 }
