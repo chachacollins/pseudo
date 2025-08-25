@@ -3,6 +3,7 @@ use std::fmt;
 #[derive(PartialEq, Debug)]
 pub enum TokenKind {
     Colon,
+    Comma,
     LParen,
     RParen,
     Semicolon,
@@ -23,6 +24,7 @@ impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TokenKind::Colon => write!(f, ":"),
+            TokenKind::Comma => write!(f, ","),
             TokenKind::LParen => write!(f, "("),
             TokenKind::RParen => write!(f, ")"),
             TokenKind::Semicolon => write!(f, ";"),
@@ -131,6 +133,7 @@ impl Lexer {
         match c {
             ':' => self.make_token(TokenKind::Colon),
             ';' => self.make_token(TokenKind::Semicolon),
+            ',' => self.make_token(TokenKind::Comma),
             '(' => self.make_token(TokenKind::LParen),
             ')' => self.make_token(TokenKind::RParen),
             '0'..='9' => {

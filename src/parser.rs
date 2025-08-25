@@ -127,20 +127,51 @@ fn parse_write_stmt<T: Iterator<Item = Token>>(lexer: &mut T) -> Stmts {
     Stmts::Write(expr)
 }
 
+fn parse_params<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Vec<Param> {
+    let mut params = Vec::new();
+    while let Some(token) = lexer.peek() {
+        match token.kind {
+            TokenKind::RParen => break,
+            TokenKind::Ident(_) => {
+                let name = get_and_expect_ident(lexer);
+                get_and_expect(TokenKind::Colon, lexer);
+                let param_type = parse_type(lexer);
+                params.push(Param { name, param_type });
+            }
+            TokenKind::Comma => {
+                get_and_expect(TokenKind::Comma, lexer);
+                continue;
+            }
+            _ => {
+                compiler_error!(
+                    token,
+                    format!("unexpect token {} in function parameters", token.kind)
+                );
+            }
+        }
+    }
+    params
+}
+
 fn parse_func_stmt<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Stmts {
     let name = get_and_expect_ident(lexer);
+
     get_and_expect(TokenKind::LParen, lexer);
+    let params = parse_params(lexer);
     get_and_expect(TokenKind::RParen, lexer);
+
     get_and_expect(TokenKind::Colon, lexer);
     let return_type = parse_type(lexer);
+
     get_and_expect(TokenKind::Start, lexer);
     let stmts = parse_statements(lexer);
     get_and_expect(TokenKind::Stop, lexer);
+
     Stmts::SubProgramDef {
         name,
         return_type,
         stmts,
-        params: Vec::new(),
+        params,
     }
 }
 
