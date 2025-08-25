@@ -7,39 +7,31 @@ fn generate_prelude(sink: &mut impl Write) -> Result {
     Ok(())
 }
 
-fn generate_write_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result {
-    if let Some(expr) = expr {
-        let write_value = match expr {
-            Expr::I32Number(num) => {
-                format!("\"%d\", {num}")
-            }
-            Expr::U32Number(_) => todo!(),
-            Expr::String(str) => {
-                format!("\"{str}\"")
-            }
-        };
-        writeln!(sink, "printf({write_value});")?;
-    } else {
-        writeln!(sink, "printf(\"\");")?;
-    }
+fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
+    let write_value = match expr {
+        Expr::I32Number(num) => {
+            format!("\"%d\", {num}")
+        }
+        Expr::U32Number(_) => todo!(),
+        Expr::String(str) => {
+            format!("\"{str}\"")
+        }
+    };
+    writeln!(sink, "printf({write_value});")?;
     Ok(())
 }
 
-fn generate_return_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result {
-    if let Some(expr) = expr {
-        let ret_value = match expr {
-            Expr::I32Number(num) => {
-                format!("{num}")
-            }
-            Expr::U32Number(_) => todo!(),
-            Expr::String(str) => {
-                format!("\"{str}\"")
-            }
-        };
-        writeln!(sink, "return {ret_value};")?;
-    } else {
-        writeln!(sink, "return;")?;
-    }
+fn generate_return_stmt(sink: &mut impl Write, expr: Expr) -> Result {
+    let ret_value = match expr {
+        Expr::I32Number(num) => {
+            format!("{num}")
+        }
+        Expr::U32Number(_) => todo!(),
+        Expr::String(str) => {
+            format!("\"{str}\"")
+        }
+    };
+    writeln!(sink, "return {ret_value};")?;
     Ok(())
 }
 
@@ -54,6 +46,7 @@ fn generate_subprogram_stmt(
         Type::Int => write!(sink, "int32_t ")?,
         Type::String => write!(sink, "char* ")?,
         Type::Nat => todo!(),
+        Type::Unknown => unreachable!(),
     }
 
     write!(sink, "{name}")?;
@@ -66,6 +59,7 @@ fn generate_subprogram_stmt(
                 Type::Int => "int32_t",
                 Type::String => "char*",
                 Type::Nat => todo!(),
+                Type::Unknown => unreachable!(),
             };
             format!("{} {}", type_str, param.name)
         })

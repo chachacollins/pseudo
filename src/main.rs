@@ -20,8 +20,9 @@ fn main() {
     let lexer = Lexer::new(file_name.to_string(), source);
     let mut parser = parser::Parser::new(lexer);
     let stmts = parser.parse_program();
-    let mut code = String::new();
-    codegen::generate_c_code(&mut code, stmts).unwrap();
-    let output_filename = format!("{}.c", file_name.splitn(2, '.').collect::<Vec<&str>>()[0]);
-    fs::write(output_filename, code).unwrap();
+    println!("{stmts:?}")
+    // let mut code = String::new();
+    // codegen::generate_c_code(&mut code, stmts).unwrap();
+    // let output_filename = format!("{}.c", file_name.splitn(2, '.').collect::<Vec<&str>>()[0]);
+    // fs::write(output_filename, code).unwrap();
 }

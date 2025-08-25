@@ -7,12 +7,22 @@ pub enum Expr {
     U32Number(u32),
     String(String),
 }
+impl Expr {
+    pub fn get_type(&self) -> Type {
+        match self {
+            Expr::I32Number(_) => Type::Int,
+            Expr::U32Number(_) => Type::Nat,
+            Expr::String(_) => Type::String,
+        }
+    }
+}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Nat,
     String,
     Int,
+    Unknown,
 }
 
 #[derive(Debug)]
@@ -23,8 +33,8 @@ pub struct Param {
 
 #[derive(Debug)]
 pub enum Stmts {
-    Write(Option<Expr>),
-    Return(Option<Expr>),
+    Write(Expr),
+    Return(Expr),
     SubProgramDef {
         name: String,
         return_type: Type,
@@ -47,19 +57,33 @@ macro_rules! compiler_error {
     };
 }
 
+struct ParserCtx {
+    is_subprogram: bool,
+    expected_type: Type,
+}
+
 pub struct Parser {
     lexer: Peekable<Lexer>,
+    ctx: Option<ParserCtx>,
 }
 
 impl Parser {
     pub fn new(lexer: Lexer) -> Self {
         Self {
             lexer: lexer.peekable(),
+            ctx: None,
         }
     }
 
     pub fn parse_program(&mut self) -> Vec<Stmts> {
         self.parse_statements()
+    }
+
+    fn ctx_mut(&mut self) -> &mut ParserCtx {
+        self.ctx.get_or_insert_with(|| ParserCtx {
+            is_subprogram: false,
+            expected_type: Type::Unknown,
+        })
     }
 
     fn get_and_expect(&mut self, token_kind: TokenKind) {
@@ -91,15 +115,17 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self) -> Option<Expr> {
+    fn parse_expression(&mut self) -> Expr {
         if let Some(token) = self.lexer.next() {
             match token.kind {
                 TokenKind::Number(ref num) => {
                     let num = num
                         .parse::<i128>()
                         .expect("Could not parse into i128 number");
-                    if num >= i32::MIN as i128 && num <= i32::MAX as i128 {
-                        Some(Expr::I32Number(num as i32))
+                    if self.ctx_mut().expected_type == Type::Int {
+                        Expr::I32Number(num as i32)
+                    } else if self.ctx_mut().expected_type == Type::Nat {
+                        Expr::U32Number(num as u32)
                     } else {
                         compiler_error!(
                             token,
@@ -107,7 +133,7 @@ impl Parser {
                         );
                     }
                 }
-                TokenKind::String(str) => Some(Expr::String(str)),
+                TokenKind::String(str) => Expr::String(str),
                 _ => {
                     compiler_error!(
                         token,
@@ -116,7 +142,7 @@ impl Parser {
                 }
             }
         } else {
-            None
+            compiler_error!("expected expression but found none");
         }
     }
 
@@ -125,6 +151,7 @@ impl Parser {
         if let Some(token) = self.lexer.next() {
             match token.kind {
                 TokenKind::Int => Type::Int,
+                TokenKind::Nat => Type::Nat,
                 _ => {
                     compiler_error!(token, format!("unknown type \"{}\"", token.kind));
                     unreachable!();
@@ -139,6 +166,13 @@ impl Parser {
     fn parse_return_stmt(&mut self) -> Stmts {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
+        if self.ctx_mut().expected_type != expr.get_type() {
+            compiler_error!(format!(
+                "return type mismatch: expected {:?}, found {:?}",
+                self.ctx_mut().expected_type,
+                expr.get_type()
+            ));
+        }
         Stmts::Return(expr)
     }
 
@@ -177,22 +211,39 @@ impl Parser {
     }
 
     fn parse_func_stmt(&mut self) -> Stmts {
+        if self.ctx_mut().is_subprogram {
+            compiler_error!("Cannot define a function within another subprogram");
+        }
+        self.ctx_mut().is_subprogram = true;
         let name = self.get_and_expect_ident();
+
+        let is_main_func = name == "main";
 
         self.get_and_expect(TokenKind::LParen);
         let params = self.parse_params();
         self.get_and_expect(TokenKind::RParen);
 
-        if name == "main" && !params.is_empty() {
+        if is_main_func && !params.is_empty() {
             compiler_error!("main function doesn't take any parameters");
         }
 
         self.get_and_expect(TokenKind::Colon);
         let return_type = self.parse_type();
 
+        if is_main_func && return_type != Type::Int {
+            compiler_error!("main function MUST return an integer");
+        }
+
+        self.ctx_mut().expected_type = return_type.clone();
+
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::Stop);
+        let has_return = stmts.iter().any(|stmt| matches!(stmt, Stmts::Return(_)));
+        if !has_return {
+            compiler_error!("each function must have a return value");
+        }
+        self.ctx_mut().is_subprogram = false;
 
         Stmts::SubProgramDef {
             name,
