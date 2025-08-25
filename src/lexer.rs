@@ -2,17 +2,24 @@ use std::fmt;
 
 #[derive(PartialEq, Debug)]
 pub enum TokenKind {
+    //Symbols
     Colon,
     Comma,
     LParen,
     RParen,
     Semicolon,
+
+    //Keywords
     Func,
     Start,
     Stop,
     Write,
     Return,
-    I32,
+
+    //Types
+    Int,
+    Nat,
+
     Number(String),
     String(String),
     Ident(String),
@@ -33,7 +40,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Stop => write!(f, "stop"),
             TokenKind::Write => write!(f, "write"),
             TokenKind::Return => write!(f, "return"),
-            TokenKind::I32 => write!(f, "i32"),
+            TokenKind::Int => write!(f, "int"),
+            TokenKind::Nat => write!(f, "nat"),
             TokenKind::Number(num) => write!(f, "number \"{num}\""),
             TokenKind::String(string) => write!(f, "string \"{string}\""),
             TokenKind::Ident(string) => write!(f, "identifier \"{string}\""),
@@ -120,7 +128,8 @@ impl Lexer {
             "start" => TokenKind::Start,
             "stop" => TokenKind::Stop,
             "func" => TokenKind::Func,
-            "i32" => TokenKind::I32,
+            "int" => TokenKind::Int,
+            "nat" => TokenKind::Nat,
             "write" => TokenKind::Write,
             "return" => TokenKind::Return,
             _ => TokenKind::Ident(ident.to_string()),

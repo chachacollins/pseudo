@@ -13,6 +13,7 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result {
             Expr::I32Number(num) => {
                 format!("\"%d\", {num}")
             }
+            Expr::U32Number(_) => todo!(),
             Expr::String(str) => {
                 format!("\"{str}\"")
             }
@@ -30,6 +31,7 @@ fn generate_return_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result {
             Expr::I32Number(num) => {
                 format!("{num}")
             }
+            Expr::U32Number(_) => todo!(),
             Expr::String(str) => {
                 format!("\"{str}\"")
             }
@@ -49,8 +51,9 @@ fn generate_subprogram_stmt(
     stmts: Vec<Stmts>,
 ) -> Result {
     match return_type {
-        Type::I32 => write!(sink, "int32_t ")?,
+        Type::Int => write!(sink, "int32_t ")?,
         Type::String => write!(sink, "char* ")?,
+        Type::Nat => todo!(),
     }
 
     write!(sink, "{name}")?;
@@ -60,8 +63,9 @@ fn generate_subprogram_stmt(
         .iter()
         .map(|param| {
             let type_str = match param.param_type {
-                Type::I32 => "int32_t",
+                Type::Int => "int32_t",
                 Type::String => "char*",
+                Type::Nat => todo!(),
             };
             format!("{} {}", type_str, param.name)
         })

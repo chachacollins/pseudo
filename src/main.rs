@@ -18,7 +18,8 @@ fn main() {
         .map_err(|err| eprintln!("Could not open file: {file_name} because of {err}"))
         .unwrap();
     let lexer = Lexer::new(file_name.to_string(), source);
-    let stmts = parser::parse_statements(&mut lexer.peekable());
+    let mut parser = parser::Parser::new(lexer);
+    let stmts = parser.parse_program();
     let mut code = String::new();
     codegen::generate_c_code(&mut code, stmts).unwrap();
     let output_filename = format!("{}.c", file_name.splitn(2, '.').collect::<Vec<&str>>()[0]);

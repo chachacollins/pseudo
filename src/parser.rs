@@ -1,16 +1,18 @@
-use crate::lexer::{Token, TokenKind};
+use crate::lexer::{Lexer, TokenKind};
 use std::iter::Peekable;
 
 #[derive(Debug)]
 pub enum Expr {
     I32Number(i32),
+    U32Number(u32),
     String(String),
 }
 
 #[derive(Debug)]
 pub enum Type {
+    Nat,
     String,
-    I32,
+    Int,
 }
 
 #[derive(Debug)]
@@ -45,163 +47,183 @@ macro_rules! compiler_error {
     };
 }
 
-fn parse_expression<T: Iterator<Item = Token>>(lexer: &mut T) -> Option<Expr> {
-    if let Some(token) = lexer.next() {
-        match token.kind {
-            TokenKind::Number(ref num) => {
-                let num = num
-                    .parse::<i128>()
-                    .expect("Could not parse into i128 number");
-                if num >= i32::MIN as i128 && num <= i32::MAX as i128 {
-                    Some(Expr::I32Number(num as i32))
-                } else {
+pub struct Parser {
+    lexer: Peekable<Lexer>,
+}
+
+impl Parser {
+    pub fn new(lexer: Lexer) -> Self {
+        Self {
+            lexer: lexer.peekable(),
+        }
+    }
+
+    pub fn parse_program(&mut self) -> Vec<Stmts> {
+        self.parse_statements()
+    }
+
+    fn get_and_expect(&mut self, token_kind: TokenKind) {
+        if let Some(token) = self.lexer.next() {
+            if token.kind != token_kind {
+                compiler_error!(
+                    token,
+                    format!("expected {} but found {}", token_kind, token.kind)
+                );
+            }
+        } else {
+            compiler_error!(format!("expected {} but found eof", token_kind));
+        }
+    }
+
+    fn get_and_expect_ident(&mut self) -> String {
+        if let Some(token) = self.lexer.next() {
+            match token.kind {
+                TokenKind::Ident(name) => name,
+                _ => {
                     compiler_error!(
                         token,
-                        format!("could not parse {} as an i32 number", token.kind)
+                        format!("expected identifier but found {}", token.kind)
                     );
                 }
             }
-            TokenKind::String(str) => Some(Expr::String(str)),
-            _ => {
-                compiler_error!(
-                    token,
-                    format!("could not parse {} as an expression", token.kind)
-                );
-            }
-        }
-    } else {
-        None
-    }
-}
-
-fn get_and_expect<T: Iterator<Item = Token>>(token_kind: TokenKind, lexer: &mut T) {
-    if let Some(token) = lexer.next() {
-        if token.kind != token_kind {
-            compiler_error!(
-                token,
-                format!("expected {} but found {}", token_kind, token.kind)
-            );
-        }
-    } else {
-        compiler_error!(format!("expected {} but found eof", token_kind));
-    }
-}
-
-fn get_and_expect_ident<T: Iterator<Item = Token>>(lexer: &mut T) -> String {
-    if let Some(token) = lexer.next() {
-        match token.kind {
-            TokenKind::Ident(name) => name,
-            _ => {
-                compiler_error!(
-                    token,
-                    format!("expected identifier but found {}", token.kind)
-                );
-            }
-        }
-    } else {
-        compiler_error!("expected identifier but found eof");
-    }
-}
-
-#[allow(unreachable_code)]
-fn parse_type<T: Iterator<Item = Token>>(lexer: &mut T) -> Type {
-    if let Some(token) = lexer.next() {
-        match token.kind {
-            TokenKind::I32 => Type::I32,
-            _ => {
-                compiler_error!(token, format!("unknown type \"{}\"", token.kind));
-                unreachable!();
-            }
-        }
-    } else {
-        compiler_error!("expected a type but found eof");
-        unreachable!();
-    }
-}
-
-fn parse_write_stmt<T: Iterator<Item = Token>>(lexer: &mut T) -> Stmts {
-    get_and_expect(TokenKind::LParen, lexer);
-    let expr = parse_expression(lexer);
-    get_and_expect(TokenKind::RParen, lexer);
-    get_and_expect(TokenKind::Semicolon, lexer);
-    Stmts::Write(expr)
-}
-
-fn parse_params<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Vec<Param> {
-    let mut params = Vec::new();
-    while let Some(token) = lexer.peek() {
-        match token.kind {
-            TokenKind::RParen => break,
-            TokenKind::Ident(_) => {
-                let name = get_and_expect_ident(lexer);
-                get_and_expect(TokenKind::Colon, lexer);
-                let param_type = parse_type(lexer);
-                params.push(Param { name, param_type });
-            }
-            TokenKind::Comma => {
-                get_and_expect(TokenKind::Comma, lexer);
-                continue;
-            }
-            _ => {
-                compiler_error!(
-                    token,
-                    format!("unexpect token {} in function parameters", token.kind)
-                );
-            }
+        } else {
+            compiler_error!("expected identifier but found eof");
         }
     }
-    params
-}
 
-fn parse_func_stmt<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Stmts {
-    let name = get_and_expect_ident(lexer);
-
-    get_and_expect(TokenKind::LParen, lexer);
-    let params = parse_params(lexer);
-    get_and_expect(TokenKind::RParen, lexer);
-
-    get_and_expect(TokenKind::Colon, lexer);
-    let return_type = parse_type(lexer);
-
-    get_and_expect(TokenKind::Start, lexer);
-    let stmts = parse_statements(lexer);
-    get_and_expect(TokenKind::Stop, lexer);
-
-    Stmts::SubProgramDef {
-        name,
-        return_type,
-        stmts,
-        params,
-    }
-}
-
-fn parse_return_stmt<T: Iterator<Item = Token>>(lexer: &mut T) -> Stmts {
-    let expr = parse_expression(lexer);
-    get_and_expect(TokenKind::Semicolon, lexer);
-    Stmts::Return(expr)
-}
-
-pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Vec<Stmts> {
-    let mut statements = Vec::new();
-    while let Some(token) = lexer.peek() {
-        if matches!(token.kind, TokenKind::Stop) {
-            break;
-        }
-        let token = lexer.next().unwrap();
-        match token.kind {
-            TokenKind::Write => {
-                statements.push(parse_write_stmt(lexer));
+    fn parse_expression(&mut self) -> Option<Expr> {
+        if let Some(token) = self.lexer.next() {
+            match token.kind {
+                TokenKind::Number(ref num) => {
+                    let num = num
+                        .parse::<i128>()
+                        .expect("Could not parse into i128 number");
+                    if num >= i32::MIN as i128 && num <= i32::MAX as i128 {
+                        Some(Expr::I32Number(num as i32))
+                    } else {
+                        compiler_error!(
+                            token,
+                            format!("could not parse {} as an i32 number", token.kind)
+                        );
+                    }
+                }
+                TokenKind::String(str) => Some(Expr::String(str)),
+                _ => {
+                    compiler_error!(
+                        token,
+                        format!("could not parse {} as an expression", token.kind)
+                    );
+                }
             }
-            TokenKind::Func => {
-                statements.push(parse_func_stmt(lexer));
-            }
-            TokenKind::Return => {
-                statements.push(parse_return_stmt(lexer));
-            }
-            _ => {
-                compiler_error!(token, format!("unexpected token {}", token.kind));
-            }
+        } else {
+            None
         }
     }
-    statements
+
+    #[allow(unreachable_code)]
+    fn parse_type(&mut self) -> Type {
+        if let Some(token) = self.lexer.next() {
+            match token.kind {
+                TokenKind::Int => Type::Int,
+                _ => {
+                    compiler_error!(token, format!("unknown type \"{}\"", token.kind));
+                    unreachable!();
+                }
+            }
+        } else {
+            compiler_error!("expected a type but found eof");
+            unreachable!();
+        }
+    }
+
+    fn parse_return_stmt(&mut self) -> Stmts {
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Semicolon);
+        Stmts::Return(expr)
+    }
+
+    fn parse_write_stmt(&mut self) -> Stmts {
+        self.get_and_expect(TokenKind::LParen);
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::RParen);
+        self.get_and_expect(TokenKind::Semicolon);
+        Stmts::Write(expr)
+    }
+
+    fn parse_params(&mut self) -> Vec<Param> {
+        let mut params = Vec::new();
+        while let Some(token) = self.lexer.peek() {
+            match token.kind {
+                TokenKind::RParen => break,
+                TokenKind::Ident(_) => {
+                    let name = self.get_and_expect_ident();
+                    self.get_and_expect(TokenKind::Colon);
+                    let param_type = self.parse_type();
+                    params.push(Param { name, param_type });
+                }
+                TokenKind::Comma => {
+                    self.get_and_expect(TokenKind::Comma);
+                    continue;
+                }
+                _ => {
+                    compiler_error!(
+                        token,
+                        format!("unexpect token {} in function parameters", token.kind)
+                    );
+                }
+            }
+        }
+        params
+    }
+
+    fn parse_func_stmt(&mut self) -> Stmts {
+        let name = self.get_and_expect_ident();
+
+        self.get_and_expect(TokenKind::LParen);
+        let params = self.parse_params();
+        self.get_and_expect(TokenKind::RParen);
+
+        if name == "main" && !params.is_empty() {
+            compiler_error!("main function doesn't take any parameters");
+        }
+
+        self.get_and_expect(TokenKind::Colon);
+        let return_type = self.parse_type();
+
+        self.get_and_expect(TokenKind::Start);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::Stop);
+
+        Stmts::SubProgramDef {
+            name,
+            return_type,
+            stmts,
+            params,
+        }
+    }
+
+    fn parse_statements(&mut self) -> Vec<Stmts> {
+        let mut statements = Vec::new();
+        while let Some(token) = self.lexer.peek() {
+            if matches!(token.kind, TokenKind::Stop) {
+                break;
+            }
+            let token = self.lexer.next().unwrap();
+            match token.kind {
+                TokenKind::Write => {
+                    statements.push(self.parse_write_stmt());
+                }
+                TokenKind::Func => {
+                    statements.push(self.parse_func_stmt());
+                }
+                TokenKind::Return => {
+                    statements.push(self.parse_return_stmt());
+                }
+                _ => {
+                    compiler_error!(token, format!("unexpected token {}", token.kind));
+                }
+            }
+        }
+        statements
+    }
 }
