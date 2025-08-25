@@ -6,6 +6,7 @@ pub enum Expr {
     I32Number(i32),
     U32Number(u32),
     String(String),
+    SubprogramCall { name: String, args: Vec<Expr> },
 }
 impl Expr {
     pub fn get_type(&self) -> Type {
@@ -13,6 +14,27 @@ impl Expr {
             Expr::I32Number(_) => Type::Int,
             Expr::U32Number(_) => Type::Nat,
             Expr::String(_) => Type::String,
+            Expr::SubprogramCall { .. } => todo!(),
+        }
+    }
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::I32Number(n) => write!(f, "{n}"),
+            Expr::U32Number(n) => write!(f, "{n}"),
+            Expr::String(s) => write!(f, "\"{s}\""),
+            Expr::SubprogramCall { name, args } => {
+                write!(f, "{}(", name)?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{arg}")?;
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -134,6 +156,19 @@ impl Parser {
                     }
                 }
                 TokenKind::String(str) => Expr::String(str),
+                TokenKind::Ident(name) => {
+                    self.get_and_expect(TokenKind::LParen);
+                    let mut args = Vec::new();
+                    while let Some(token) = self.lexer.peek() {
+                        if token.kind == TokenKind::RParen {
+                            break;
+                        }
+                        let expr = self.parse_expression();
+                        args.push(expr)
+                    }
+                    self.get_and_expect(TokenKind::RParen);
+                    Expr::SubprogramCall { name, args }
+                }
                 _ => {
                     compiler_error!(
                         token,

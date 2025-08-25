@@ -12,9 +12,15 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
         Expr::I32Number(num) => {
             format!("\"%d\", {num}")
         }
-        Expr::U32Number(_) => todo!(),
+        Expr::U32Number(num) => {
+            format!("\"%u\", {num}")
+        }
         Expr::String(str) => {
             format!("\"{str}\"")
+        }
+        Expr::SubprogramCall { .. } => {
+            //TODO: Handle return type
+            format!("\"%d\", {}", expr) // Uses Display implementation
         }
     };
     writeln!(sink, "printf({write_value});")?;
@@ -22,16 +28,7 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
 }
 
 fn generate_return_stmt(sink: &mut impl Write, expr: Expr) -> Result {
-    let ret_value = match expr {
-        Expr::I32Number(num) => {
-            format!("{num}")
-        }
-        Expr::U32Number(_) => todo!(),
-        Expr::String(str) => {
-            format!("\"{str}\"")
-        }
-    };
-    writeln!(sink, "return {ret_value};")?;
+    writeln!(sink, "return {expr};")?;
     Ok(())
 }
 
@@ -45,7 +42,7 @@ fn generate_subprogram_stmt(
     match return_type {
         Type::Int => write!(sink, "int32_t ")?,
         Type::String => write!(sink, "char* ")?,
-        Type::Nat => todo!(),
+        Type::Nat => write!(sink, "uint32_t ")?,
         Type::Unknown => unreachable!(),
     }
 
