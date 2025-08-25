@@ -1,4 +1,4 @@
-use crate::lexer::{Lexer, TokenKind};
+use crate::lexer::{Lexer, Token, TokenKind};
 use std::collections::HashMap;
 use std::iter::Peekable;
 
@@ -71,10 +71,6 @@ pub enum Stmts {
 }
 
 macro_rules! compiler_error {
-    ($error_msg:expr) => {
-        eprintln!("\x1b[31merror:\x1b[0m {}", $error_msg);
-        std::process::exit(1);
-    };
     ($token:expr, $error_msg:expr) => {
         eprintln!(
             "{}:{}:{}: \x1b[31merror:\x1b[0m {}",
@@ -97,6 +93,7 @@ struct ParserCtx {
 
 pub struct Parser {
     lexer: Peekable<Lexer>,
+    curr_token: Option<Token>,
     ctx: Option<ParserCtx>,
 }
 
@@ -104,6 +101,7 @@ impl Parser {
     pub fn new(lexer: Lexer) -> Self {
         Self {
             lexer: lexer.peekable(),
+            curr_token: None,
             ctx: None,
         }
     }
@@ -129,7 +127,10 @@ impl Parser {
                 );
             }
         } else {
-            compiler_error!(format!("expected {} but found eof", token_kind));
+            compiler_error!(
+                self.curr_token(),
+                format!("expected {} but found eof", token_kind)
+            );
         }
     }
 
@@ -145,7 +146,7 @@ impl Parser {
                 }
             }
         } else {
-            compiler_error!("expected identifier but found eof");
+            compiler_error!(self.curr_token(), "expected identifier but found eof");
         }
     }
 
@@ -194,7 +195,7 @@ impl Parser {
                             return_type,
                         }
                     } else {
-                        compiler_error!(format!("Unknown {}", token.kind));
+                        compiler_error!(self.curr_token(), format!("Unknown {}", token.kind));
                     }
                 }
                 _ => {
@@ -205,7 +206,7 @@ impl Parser {
                 }
             }
         } else {
-            compiler_error!("expected expression but found none");
+            compiler_error!(self.curr_token(), "expected expression but found none");
         }
     }
 
@@ -221,7 +222,7 @@ impl Parser {
                 }
             }
         } else {
-            compiler_error!("expected a type but found eof");
+            compiler_error!(self.curr_token(), "expected a type but found eof");
             unreachable!();
         }
     }
@@ -230,11 +231,14 @@ impl Parser {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
         if self.ctx_mut().expected_type != expr.get_type() {
-            compiler_error!(format!(
-                "return type mismatch: expected {:?}, found {:?}",
-                self.ctx_mut().expected_type,
-                expr.get_type()
-            ));
+            compiler_error!(
+                self.curr_token().clone(),
+                format!(
+                    "return type mismatch: expected {:?}, found {:?}",
+                    self.ctx_mut().expected_type,
+                    expr.get_type()
+                )
+            );
         }
         Stmts::Return(expr)
     }
@@ -275,13 +279,19 @@ impl Parser {
 
     fn parse_func_stmt(&mut self) -> Stmts {
         if self.ctx_mut().is_subprogram {
-            compiler_error!("cannot define a function within another subprogram");
+            compiler_error!(
+                self.curr_token(),
+                "cannot define a function within another subprogram"
+            );
         }
         self.ctx_mut().is_subprogram = true;
         let name = self.get_and_expect_ident();
 
         if self.ctx_mut().subprogram_table.contains_key(&name) {
-            compiler_error!(format!("redefinition of function {}", name));
+            compiler_error!(
+                self.curr_token(),
+                format!("redefinition of function {}", name)
+            );
         }
 
         let is_main_func = name == "main";
@@ -291,14 +301,17 @@ impl Parser {
         self.get_and_expect(TokenKind::RParen);
 
         if is_main_func && !params.is_empty() {
-            compiler_error!("main function doesn't take any parameters");
+            compiler_error!(
+                self.curr_token(),
+                "main function doesn't take any parameters"
+            );
         }
 
         self.get_and_expect(TokenKind::Colon);
         let return_type = self.parse_type();
 
         if is_main_func && return_type != Type::Int {
-            compiler_error!("main function MUST return an integer");
+            compiler_error!(self.curr_token(), "main function MUST return an integer");
         }
 
         self.ctx_mut().expected_type = return_type.clone();
@@ -308,7 +321,7 @@ impl Parser {
         self.get_and_expect(TokenKind::Stop);
         let has_return = stmts.iter().any(|stmt| matches!(stmt, Stmts::Return(_)));
         if !has_return {
-            compiler_error!("each function must have a return value");
+            compiler_error!(self.curr_token(), "each function must have a return value");
         }
         self.ctx_mut().is_subprogram = false;
         self.ctx_mut().subprogram_table.insert(
@@ -326,6 +339,12 @@ impl Parser {
         }
     }
 
+    fn curr_token(&self) -> &Token {
+        self.curr_token
+            .as_ref()
+            .expect("There should be a valid token in here always")
+    }
+
     fn parse_statements(&mut self) -> Vec<Stmts> {
         let mut statements = Vec::new();
         while let Some(token) = self.lexer.peek() {
@@ -333,7 +352,8 @@ impl Parser {
                 break;
             }
             let token = self.lexer.next().unwrap();
-            match token.kind {
+            self.curr_token = Some(token);
+            match self.curr_token().kind {
                 TokenKind::Write => {
                     statements.push(self.parse_write_stmt());
                 }
@@ -344,7 +364,10 @@ impl Parser {
                     statements.push(self.parse_return_stmt());
                 }
                 _ => {
-                    compiler_error!(token, format!("unexpected token {}", token.kind));
+                    compiler_error!(
+                        self.curr_token(),
+                        format!("unexpected token {}", self.curr_token().kind)
+                    );
                 }
             }
         }
