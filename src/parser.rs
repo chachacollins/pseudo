@@ -1,4 +1,5 @@
 use crate::lexer::{Lexer, TokenKind};
+use std::collections::HashMap;
 use std::iter::Peekable;
 
 #[derive(Debug)]
@@ -6,7 +7,11 @@ pub enum Expr {
     I32Number(i32),
     U32Number(u32),
     String(String),
-    SubprogramCall { name: String, args: Vec<Expr> },
+    SubprogramCall {
+        name: String,
+        args: Vec<Expr>,
+        return_type: Type,
+    },
 }
 impl Expr {
     pub fn get_type(&self) -> Type {
@@ -14,7 +19,7 @@ impl Expr {
             Expr::I32Number(_) => Type::Int,
             Expr::U32Number(_) => Type::Nat,
             Expr::String(_) => Type::String,
-            Expr::SubprogramCall { .. } => todo!(),
+            Expr::SubprogramCall { return_type, .. } => return_type.clone(),
         }
     }
 }
@@ -25,7 +30,7 @@ impl std::fmt::Display for Expr {
             Expr::I32Number(n) => write!(f, "{n}"),
             Expr::U32Number(n) => write!(f, "{n}"),
             Expr::String(s) => write!(f, "\"{s}\""),
-            Expr::SubprogramCall { name, args } => {
+            Expr::SubprogramCall { name, args, .. } => {
                 write!(f, "{}(", name)?;
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
@@ -79,9 +84,15 @@ macro_rules! compiler_error {
     };
 }
 
+struct SubProgCtx {
+    arity: u8,
+    return_type: Type,
+}
+
 struct ParserCtx {
     is_subprogram: bool,
     expected_type: Type,
+    subprogram_table: HashMap<String, SubProgCtx>,
 }
 
 pub struct Parser {
@@ -105,6 +116,7 @@ impl Parser {
         self.ctx.get_or_insert_with(|| ParserCtx {
             is_subprogram: false,
             expected_type: Type::Unknown,
+            subprogram_table: HashMap::new(),
         })
     }
 
@@ -156,18 +168,34 @@ impl Parser {
                     }
                 }
                 TokenKind::String(str) => Expr::String(str),
-                TokenKind::Ident(name) => {
-                    self.get_and_expect(TokenKind::LParen);
-                    let mut args = Vec::new();
-                    while let Some(token) = self.lexer.peek() {
-                        if token.kind == TokenKind::RParen {
-                            break;
+                TokenKind::Ident(ref name) => {
+                    if self.ctx_mut().subprogram_table.contains_key(name) {
+                        let return_type = self
+                            .ctx_mut()
+                            .subprogram_table
+                            .get(name)
+                            .unwrap()
+                            .return_type
+                            .clone();
+
+                        self.get_and_expect(TokenKind::LParen);
+                        let mut args = Vec::new();
+                        while let Some(token) = self.lexer.peek() {
+                            if token.kind == TokenKind::RParen {
+                                break;
+                            }
+                            let expr = self.parse_expression();
+                            args.push(expr)
                         }
-                        let expr = self.parse_expression();
-                        args.push(expr)
+                        self.get_and_expect(TokenKind::RParen);
+                        Expr::SubprogramCall {
+                            name: name.to_string(),
+                            args,
+                            return_type,
+                        }
+                    } else {
+                        compiler_error!(format!("Unknown {}", token.kind));
                     }
-                    self.get_and_expect(TokenKind::RParen);
-                    Expr::SubprogramCall { name, args }
                 }
                 _ => {
                     compiler_error!(
@@ -247,10 +275,14 @@ impl Parser {
 
     fn parse_func_stmt(&mut self) -> Stmts {
         if self.ctx_mut().is_subprogram {
-            compiler_error!("Cannot define a function within another subprogram");
+            compiler_error!("cannot define a function within another subprogram");
         }
         self.ctx_mut().is_subprogram = true;
         let name = self.get_and_expect_ident();
+
+        if self.ctx_mut().subprogram_table.contains_key(&name) {
+            compiler_error!(format!("redefinition of function {}", name));
+        }
 
         let is_main_func = name == "main";
 
@@ -279,7 +311,13 @@ impl Parser {
             compiler_error!("each function must have a return value");
         }
         self.ctx_mut().is_subprogram = false;
-
+        self.ctx_mut().subprogram_table.insert(
+            name.clone(),
+            SubProgCtx {
+                arity: params.len() as u8,
+                return_type: return_type.clone(),
+            },
+        );
         Stmts::SubProgramDef {
             name,
             return_type,
