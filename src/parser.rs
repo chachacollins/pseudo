@@ -119,6 +119,37 @@ fn parse_type<T: Iterator<Item = Token>>(lexer: &mut T) -> Type {
     }
 }
 
+fn parse_write_stmt<T: Iterator<Item = Token>>(lexer: &mut T) -> Stmts {
+    get_and_expect(TokenKind::LParen, lexer);
+    let expr = parse_expression(lexer);
+    get_and_expect(TokenKind::RParen, lexer);
+    get_and_expect(TokenKind::Semicolon, lexer);
+    Stmts::Write(expr)
+}
+
+fn parse_func_stmt<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Stmts {
+    let name = get_and_expect_ident(lexer);
+    get_and_expect(TokenKind::LParen, lexer);
+    get_and_expect(TokenKind::RParen, lexer);
+    get_and_expect(TokenKind::Colon, lexer);
+    let return_type = parse_type(lexer);
+    get_and_expect(TokenKind::Start, lexer);
+    let stmts = parse_statements(lexer);
+    get_and_expect(TokenKind::Stop, lexer);
+    Stmts::SubProgramDef {
+        name,
+        return_type,
+        stmts,
+        params: Vec::new(),
+    }
+}
+
+fn parse_return_stmt<T: Iterator<Item = Token>>(lexer: &mut T) -> Stmts {
+    let expr = parse_expression(lexer);
+    get_and_expect(TokenKind::Semicolon, lexer);
+    Stmts::Return(expr)
+}
+
 pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Vec<Stmts> {
     let mut statements = Vec::new();
     while let Some(token) = lexer.peek() {
@@ -128,32 +159,13 @@ pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> V
         let token = lexer.next().unwrap();
         match token.kind {
             TokenKind::Write => {
-                get_and_expect(TokenKind::LParen, lexer);
-                let expr = parse_expression(lexer);
-                get_and_expect(TokenKind::RParen, lexer);
-                get_and_expect(TokenKind::Semicolon, lexer);
-                statements.push(Stmts::Write(expr));
+                statements.push(parse_write_stmt(lexer));
             }
             TokenKind::Func => {
-                let name = get_and_expect_ident(lexer);
-                get_and_expect(TokenKind::LParen, lexer);
-                get_and_expect(TokenKind::RParen, lexer);
-                get_and_expect(TokenKind::Colon, lexer);
-                let return_type = parse_type(lexer);
-                get_and_expect(TokenKind::Start, lexer);
-                let stmts = parse_statements(lexer);
-                get_and_expect(TokenKind::Stop, lexer);
-                statements.push(Stmts::SubProgramDef {
-                    name,
-                    return_type,
-                    stmts,
-                    params: Vec::new(),
-                });
+                statements.push(parse_func_stmt(lexer));
             }
             TokenKind::Return => {
-                let expr = parse_expression(lexer);
-                get_and_expect(TokenKind::Semicolon, lexer);
-                statements.push(Stmts::Return(expr));
+                statements.push(parse_return_stmt(lexer));
             }
             _ => {
                 compiler_error!(token, format!("unexpected token {}", token.kind));
