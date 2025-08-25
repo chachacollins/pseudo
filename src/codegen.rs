@@ -1,13 +1,13 @@
-use crate::parser::{Expr, Param, Program, Stmts, Type};
-use std::fmt::{Error, Write};
+use crate::parser::{Expr, Param, Stmts, Type};
+use std::fmt::{Result, Write};
 
-fn generate_prelude(sink: &mut impl Write) -> Result<(), Error> {
+fn generate_prelude(sink: &mut impl Write) -> Result {
     writeln!(sink, "#include <stdio.h>")?;
     writeln!(sink, "#include <stdint.h>")?;
     Ok(())
 }
 
-fn generate_write_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result<(), Error> {
+fn generate_write_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result {
     if let Some(expr) = expr {
         let write_value = match expr {
             Expr::I32Number(num) => {
@@ -24,7 +24,7 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result<(), 
     Ok(())
 }
 
-fn generate_return_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result<(), Error> {
+fn generate_return_stmt(sink: &mut impl Write, expr: Option<Expr>) -> Result {
     if let Some(expr) = expr {
         let ret_value = match expr {
             Expr::I32Number(num) => {
@@ -47,7 +47,7 @@ fn generate_subprogram_stmt(
     return_type: Type,
     params: Vec<Param>,
     stmts: Vec<Stmts>,
-) -> Result<(), Error> {
+) -> Result {
     match return_type {
         Type::I32 => write!(sink, "int32_t ")?,
         Type::String => write!(sink, "char* ")?,
@@ -69,29 +69,30 @@ fn generate_subprogram_stmt(
     write!(sink, "{}", param_strings.join(", "))?;
     write!(sink, ")")?;
 
-    write!(sink, "{{\n")?;
-    let funct_stmt = generate_stmts(stmts, false)?;
-    write!(sink, "{funct_stmt}")?;
-    write!(sink, "}}\n")?;
+    writeln!(sink, "{{")?;
+    generate_stmts(sink, stmts)?;
+    writeln!(sink, "}}")?;
     Ok(())
 }
 
-pub fn generate_stmts(program: Program, prelude: bool) -> Result<String, Error> {
-    let mut code = String::new();
-    if prelude {
-        generate_prelude(&mut code)?;
-    }
-    for stmt in program {
+fn generate_stmts(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
+    for stmt in stmts {
         match stmt {
-            Stmts::Write(expr) => generate_write_stmt(&mut code, expr)?,
-            Stmts::Return(expr) => generate_return_stmt(&mut code, expr)?,
+            Stmts::Write(expr) => generate_write_stmt(sink, expr)?,
+            Stmts::Return(expr) => generate_return_stmt(sink, expr)?,
             Stmts::SubProgramDef {
                 name,
                 return_type,
                 params,
                 stmts,
-            } => generate_subprogram_stmt(&mut code, name, return_type, params, stmts)?,
+            } => generate_subprogram_stmt(sink, name, return_type, params, stmts)?,
         }
     }
-    Ok(code)
+    Ok(())
+}
+
+pub fn generate_c_code(sink: &mut impl Write, program: Vec<Stmts>) -> Result {
+    generate_prelude(sink)?;
+    generate_stmts(sink, program)?;
+    Ok(())
 }

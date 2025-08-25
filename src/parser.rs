@@ -119,8 +119,7 @@ fn parse_type<T: Iterator<Item = Token>>(lexer: &mut T) -> Type {
     }
 }
 
-pub type Program = Vec<Stmts>;
-pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Program {
+pub fn parse_statements<T: Iterator<Item = Token>>(lexer: &mut Peekable<T>) -> Vec<Stmts> {
     let mut statements = Vec::new();
     while let Some(token) = lexer.peek() {
         if matches!(token.kind, TokenKind::Stop) {
