@@ -44,11 +44,12 @@ impl std::fmt::Display for Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Type {
     Nat,
     String,
     Int,
+    Void,
     Unknown,
 }
 
@@ -67,6 +68,11 @@ pub enum Stmts {
         return_type: Type,
         params: Vec<Param>,
         stmts: Vec<Stmts>,
+    },
+    SubProgramCall {
+        name: String,
+        args: Vec<Expr>,
+        return_type: Type,
     },
 }
 
@@ -118,6 +124,12 @@ impl Parser {
         })
     }
 
+    fn curr_token(&self) -> &Token {
+        self.curr_token
+            .as_ref()
+            .expect("There should be a valid token in here always")
+    }
+
     fn get_and_expect(&mut self, token_kind: TokenKind) {
         if let Some(token) = self.lexer.next() {
             if token.kind != token_kind {
@@ -154,17 +166,40 @@ impl Parser {
         if let Some(token) = self.lexer.next() {
             match token.kind {
                 TokenKind::Number(ref num) => {
-                    let num = num
-                        .parse::<i128>()
-                        .expect("Could not parse into i128 number");
+                    let num = num.parse::<i128>().unwrap_or_else(|err| {
+                        compiler_error!(
+                            token,
+                            format!(
+                                "could not parse {} as a {:?} number because {err}",
+                                token.kind,
+                                self.ctx_mut().expected_type
+                            )
+                        );
+                    });
+
                     if self.ctx_mut().expected_type == Type::Int {
                         Expr::I32Number(num as i32)
                     } else if self.ctx_mut().expected_type == Type::Nat {
                         Expr::U32Number(num as u32)
+                    } else if self.ctx_mut().expected_type == Type::Unknown {
+                        if num >= i32::MIN as i128 && num <= i32::MAX as i128 {
+                            Expr::I32Number(num as i32)
+                        } else if num >= u32::MIN as i128 && num <= u32::MAX as i128 {
+                            Expr::U32Number(num as u32)
+                        } else {
+                            compiler_error!(
+                                token,
+                                format!("could not determine type of {} number", token.kind)
+                            );
+                        }
                     } else {
                         compiler_error!(
                             token,
-                            format!("could not parse {} as an i32 number", token.kind)
+                            format!(
+                                "could not parse {} as a {:?} number",
+                                token.kind,
+                                self.ctx_mut().expected_type
+                            )
                         );
                     }
                 }
@@ -180,14 +215,7 @@ impl Parser {
                             .clone();
 
                         self.get_and_expect(TokenKind::LParen);
-                        let mut args = Vec::new();
-                        while let Some(token) = self.lexer.peek() {
-                            if token.kind == TokenKind::RParen {
-                                break;
-                            }
-                            let expr = self.parse_expression();
-                            args.push(expr)
-                        }
+                        let args = self.parse_subprog_args();
                         self.get_and_expect(TokenKind::RParen);
                         Expr::SubprogramCall {
                             name: name.to_string(),
@@ -245,7 +273,10 @@ impl Parser {
 
     fn parse_write_stmt(&mut self) -> Stmts {
         self.get_and_expect(TokenKind::LParen);
+        let curr_type = self.ctx_mut().expected_type;
+        self.ctx_mut().expected_type = Type::Unknown;
         let expr = self.parse_expression();
+        self.ctx_mut().expected_type = curr_type;
         self.get_and_expect(TokenKind::RParen);
         self.get_and_expect(TokenKind::Semicolon);
         Stmts::Write(expr)
@@ -339,10 +370,99 @@ impl Parser {
         }
     }
 
-    fn curr_token(&self) -> &Token {
-        self.curr_token
-            .as_ref()
-            .expect("There should be a valid token in here always")
+    fn parse_subprog_args(&mut self) -> Vec<Expr> {
+        let mut args = Vec::new();
+        while let Some(token) = self.lexer.peek() {
+            if token.kind == TokenKind::RParen {
+                break;
+            } else if token.kind == TokenKind::Comma {
+                self.get_and_expect(TokenKind::Comma);
+                continue;
+            }
+            let expr = self.parse_expression();
+            args.push(expr)
+        }
+        args
+    }
+
+    fn parse_proc_stmt(&mut self) -> Stmts {
+        if self.ctx_mut().is_subprogram {
+            compiler_error!(
+                self.curr_token(),
+                "cannot define a procedure within another subprogram"
+            );
+        }
+        self.ctx_mut().is_subprogram = true;
+        let name = self.get_and_expect_ident();
+
+        if self.ctx_mut().subprogram_table.contains_key(&name) {
+            compiler_error!(
+                self.curr_token(),
+                format!("redefinition of subprogram {}", name)
+            );
+        }
+
+        if name == "main" {
+            compiler_error!(
+                self.curr_token(),
+                "main MUST be a function which returns an integer"
+            );
+        }
+
+        self.get_and_expect(TokenKind::LParen);
+        let params = self.parse_params();
+        self.get_and_expect(TokenKind::RParen);
+
+        self.ctx_mut().expected_type = Type::Void;
+
+        self.get_and_expect(TokenKind::Start);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::Stop);
+        self.ctx_mut().is_subprogram = false;
+        self.ctx_mut().subprogram_table.insert(
+            name.clone(),
+            SubProgCtx {
+                arity: params.len() as u8,
+                return_type: Type::Void,
+            },
+        );
+        Stmts::SubProgramDef {
+            name,
+            return_type: Type::Void,
+            stmts,
+            params,
+        }
+    }
+
+    fn parse_subprogcall_stmt(&mut self) -> Stmts {
+        let name = match self.curr_token().kind {
+            TokenKind::Ident(ref name) => name.clone(),
+            _ => unreachable!(),
+        };
+        if self.ctx_mut().subprogram_table.contains_key(&name) {
+            let return_type = self
+                .ctx_mut()
+                .subprogram_table
+                .get(&name)
+                .unwrap()
+                .return_type
+                .clone();
+
+            self.get_and_expect(TokenKind::LParen);
+            let args = self.parse_subprog_args();
+            self.get_and_expect(TokenKind::RParen);
+            self.get_and_expect(TokenKind::Semicolon);
+            Stmts::SubProgramCall {
+                name: name.to_string(),
+                args,
+                return_type,
+            }
+        } else {
+            compiler_error!(
+                self.curr_token(),
+                format!("Unknown {}", self.curr_token().kind)
+            );
+        }
     }
 
     fn parse_statements(&mut self) -> Vec<Stmts> {
@@ -354,14 +474,22 @@ impl Parser {
             let token = self.lexer.next().unwrap();
             self.curr_token = Some(token);
             match self.curr_token().kind {
-                TokenKind::Write => {
-                    statements.push(self.parse_write_stmt());
-                }
-                TokenKind::Func => {
-                    statements.push(self.parse_func_stmt());
-                }
-                TokenKind::Return => {
-                    statements.push(self.parse_return_stmt());
+                TokenKind::Write => statements.push(self.parse_write_stmt()),
+                TokenKind::Func => statements.push(self.parse_func_stmt()),
+                TokenKind::Proc => statements.push(self.parse_proc_stmt()),
+                TokenKind::Return => statements.push(self.parse_return_stmt()),
+                TokenKind::Ident(_) => {
+                    if let Some(token) = self.lexer.peek() {
+                        match token.kind {
+                            TokenKind::LParen => statements.push(self.parse_subprogcall_stmt()),
+                            _ => {
+                                compiler_error!(
+                                    self.curr_token(),
+                                    format!("free standing {}", self.curr_token().kind)
+                                );
+                            }
+                        }
+                    }
                 }
                 _ => {
                     compiler_error!(
