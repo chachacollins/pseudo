@@ -8,6 +8,12 @@ pub enum TokenKind {
     LParen,
     RParen,
     Semicolon,
+    Equal,
+    EqualEqual,
+    NotEqual,
+    Not,
+    Minus,
+    Plus,
 
     //Keywords
     Func,
@@ -16,6 +22,10 @@ pub enum TokenKind {
     Stop,
     Write,
     Return,
+    If,
+    End,
+    Then,
+    Or,
 
     //Types
     Int,
@@ -25,7 +35,7 @@ pub enum TokenKind {
     String(String),
     Ident(String),
     Eof,
-    Illegal,
+    Illegal(char),
 }
 
 impl fmt::Display for TokenKind {
@@ -33,10 +43,20 @@ impl fmt::Display for TokenKind {
         match self {
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Comma => write!(f, ","),
+            TokenKind::Minus => write!(f, "-"),
+            TokenKind::Plus => write!(f, "+"),
             TokenKind::LParen => write!(f, "("),
             TokenKind::RParen => write!(f, ")"),
             TokenKind::Semicolon => write!(f, ";"),
             TokenKind::Func => write!(f, "func"),
+            TokenKind::Not => write!(f, "!"),
+            TokenKind::Or => write!(f, "or"),
+            TokenKind::Equal => write!(f, "="),
+            TokenKind::EqualEqual => write!(f, "=="),
+            TokenKind::NotEqual => write!(f, "!="),
+            TokenKind::If => write!(f, "if"),
+            TokenKind::Then => write!(f, "then"),
+            TokenKind::End => write!(f, "end"),
             TokenKind::Proc => write!(f, "proc"),
             TokenKind::Start => write!(f, "start"),
             TokenKind::Stop => write!(f, "stop"),
@@ -48,7 +68,7 @@ impl fmt::Display for TokenKind {
             TokenKind::String(string) => write!(f, "string \"{string}\""),
             TokenKind::Ident(string) => write!(f, "identifier \"{string}\""),
             TokenKind::Eof => write!(f, "eof"),
-            TokenKind::Illegal => write!(f, "illegal"),
+            TokenKind::Illegal(tok) => write!(f, "illegal {tok}"),
         }
     }
 }
@@ -145,6 +165,10 @@ impl Lexer {
             "stop" => TokenKind::Stop,
             "func" => TokenKind::Func,
             "proc" => TokenKind::Proc,
+            "if" => TokenKind::If,
+            "or" => TokenKind::Or,
+            "then" => TokenKind::Then,
+            "end" => TokenKind::End,
             "int" => TokenKind::Int,
             "nat" => TokenKind::Nat,
             "write" => TokenKind::Write,
@@ -162,6 +186,24 @@ impl Lexer {
             ',' => self.make_token(TokenKind::Comma),
             '(' => self.make_token(TokenKind::LParen),
             ')' => self.make_token(TokenKind::RParen),
+            '!' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.make_token(TokenKind::NotEqual)
+                } else {
+                    self.make_token(TokenKind::Not)
+                }
+            }
+            '-' => self.make_token(TokenKind::Minus),
+            '+' => self.make_token(TokenKind::Plus),
+            '=' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.make_token(TokenKind::EqualEqual)
+                } else {
+                    self.make_token(TokenKind::Equal)
+                }
+            }
             '0'..='9' => {
                 let mut num = String::new();
                 num.push(c);
@@ -187,7 +229,7 @@ impl Lexer {
                 let _ = self.advance();
                 self.make_token(TokenKind::String(string))
             }
-            _ => self.make_token(TokenKind::Illegal),
+            c => self.make_token(TokenKind::Illegal(c)),
         }
     }
 }
