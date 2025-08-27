@@ -2,6 +2,30 @@ use crate::lexer::{Lexer, Token, TokenKind};
 use std::collections::HashMap;
 use std::iter::Peekable;
 
+//TODO: use let some thing
+
+#[derive(Debug)]
+pub enum Op {
+    Equal,
+    NotEqual,
+    Or,
+    Add,
+    Minus,
+}
+
+impl Op {
+    pub fn from(token_kind: TokenKind) -> Self {
+        match token_kind {
+            TokenKind::EqualEqual => Op::Equal,
+            TokenKind::NotEqual => Op::NotEqual,
+            TokenKind::Or => Op::Or,
+            TokenKind::Minus => Op::Minus,
+            TokenKind::Plus => Op::Add,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Expr {
     I32Number(i32),
@@ -16,6 +40,11 @@ pub enum Expr {
         args: Vec<Expr>,
         return_type: Type,
     },
+    Binary {
+        op: Op,
+        lhs: Option<Box<Expr>>,
+        rhs: Option<Box<Expr>>,
+    },
 }
 impl Expr {
     pub fn get_type(&self) -> Type {
@@ -23,6 +52,13 @@ impl Expr {
             Expr::I32Number(_) => Type::Int,
             Expr::U32Number(_) => Type::Nat,
             Expr::String(_) => Type::String,
+            Expr::Binary { op, lhs, .. } => match op {
+                Op::Add | Op::Minus => {
+                    let Some(lhs) = lhs else { unreachable!() };
+                    lhs.get_type()
+                }
+                Op::Equal | Op::NotEqual | Op::Or => Type::Bool,
+            },
             Expr::Variable { var_type, .. } => *var_type,
             Expr::SubprogramCall { return_type, .. } => *return_type,
         }
@@ -36,6 +72,23 @@ impl std::fmt::Display for Expr {
             Expr::U32Number(n) => write!(f, "{n}"),
             Expr::String(s) => write!(f, "\"{s}\""),
             Expr::Variable { name, .. } => write!(f, "{name}"),
+            Expr::Binary { op, lhs, rhs } => {
+                let symbol = match op {
+                    Op::Add => "+",
+                    Op::Minus => "-",
+                    Op::Equal => "==",
+                    Op::NotEqual => "!=",
+                    Op::Or => "||",
+                };
+                if let Some(lhs) = lhs {
+                    write!(f, "{lhs} ")?;
+                }
+                write!(f, "{symbol}")?;
+                if let Some(rhs) = rhs {
+                    write!(f, " {rhs}")?;
+                }
+                Ok(())
+            }
             Expr::SubprogramCall { name, args, .. } => {
                 write!(f, "{name}(")?;
                 for (i, arg) in args.iter().enumerate() {
@@ -55,6 +108,7 @@ pub enum Type {
     Nat,
     String,
     Int,
+    Bool,
     Void,
     Unknown,
 }
@@ -73,6 +127,10 @@ pub enum Stmts {
         name: String,
         return_type: Type,
         params: Vec<Param>,
+        stmts: Vec<Stmts>,
+    },
+    If {
+        expr: Expr,
         stmts: Vec<Stmts>,
     },
     SubProgramCall {
@@ -175,9 +233,10 @@ impl Parser {
         }
     }
 
+    //TODO: ADD PRECEDENCE OF SOME KIND
     fn parse_expression(&mut self) -> Expr {
         if let Some(token) = self.lexer.next() {
-            match token.kind {
+            let mut lhs = match token.kind {
                 TokenKind::Number(ref num) => {
                     let num = num.parse::<i128>().unwrap_or_else(|err| {
                         compiler_error!(
@@ -250,7 +309,28 @@ impl Parser {
                         format!("could not parse {} as an expression", token.kind)
                     );
                 }
+            };
+            while let Some(token) = self.lexer.peek() {
+                match token.kind {
+                    TokenKind::Equal
+                    | TokenKind::Minus
+                    | TokenKind::EqualEqual
+                    | TokenKind::NotEqual
+                    | TokenKind::Plus
+                    | TokenKind::Or => {
+                        let tok = self.lexer.next().unwrap();
+                        let op = Op::from(tok.kind);
+                        let rhs = self.parse_expression();
+                        lhs = Expr::Binary {
+                            op,
+                            lhs: Some(Box::new(lhs)),
+                            rhs: Some(Box::new(rhs)),
+                        }
+                    }
+                    _ => break,
+                }
             }
+            lhs
         } else {
             compiler_error!(self.curr_token(), "expected expression but found none");
         }
@@ -287,6 +367,14 @@ impl Parser {
             );
         }
         Stmts::Return(expr)
+    }
+
+    fn parse_if_stmt(&mut self) -> Stmts {
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Then);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::End);
+        Stmts::If { expr, stmts }
     }
 
     fn parse_write_stmt(&mut self) -> Stmts {
@@ -375,6 +463,14 @@ impl Parser {
 
         self.ctx_mut().expected_type = return_type;
 
+        self.ctx_mut().subprogram_table.insert(
+            name.clone(),
+            SubProgCtx {
+                arity: params.len() as u8,
+                return_type,
+            },
+        );
+
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::Stop);
@@ -383,13 +479,6 @@ impl Parser {
             compiler_error!(self.curr_token(), "each function must have a return value");
         }
         self.ctx_mut().is_subprogram = false;
-        self.ctx_mut().subprogram_table.insert(
-            name.clone(),
-            SubProgCtx {
-                arity: params.len() as u8,
-                return_type,
-            },
-        );
         self.ctx_mut().local_var_table.clear();
         Stmts::SubProgramDef {
             name,
@@ -497,7 +586,7 @@ impl Parser {
     fn parse_statements(&mut self) -> Vec<Stmts> {
         let mut statements = Vec::new();
         while let Some(token) = self.lexer.peek() {
-            if matches!(token.kind, TokenKind::Stop) {
+            if token.kind == TokenKind::Stop || token.kind == TokenKind::End {
                 break;
             }
             let token = self.lexer.next().unwrap();
@@ -507,6 +596,7 @@ impl Parser {
                 TokenKind::Func => statements.push(self.parse_func_stmt()),
                 TokenKind::Proc => statements.push(self.parse_proc_stmt()),
                 TokenKind::Return => statements.push(self.parse_return_stmt()),
+                TokenKind::If => statements.push(self.parse_if_stmt()),
                 TokenKind::Ident(_) => {
                     if let Some(token) = self.lexer.peek() {
                         match token.kind {
@@ -514,7 +604,7 @@ impl Parser {
                             _ => {
                                 compiler_error!(
                                     self.curr_token(),
-                                    format!("free standing {}", self.curr_token().kind)
+                                    format!("unknown identifier {}", self.curr_token().kind)
                                 );
                             }
                         }
