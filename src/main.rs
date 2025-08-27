@@ -6,44 +6,58 @@ use lexer::Lexer;
 use std::process::{self, Command};
 use std::{env, fs};
 
+fn cli_error(msg: &str) -> ! {
+    eprintln!("[ERROR]: {msg}");
+    process::exit(1)
+}
+
+fn print_usage() {
+    println!("[USAGE]: pseudo <input> [-o <output>]");
+}
+
 fn main() {
     let args = env::args().collect::<Vec<String>>();
     if args.len() < 2 {
-        eprintln!("[ERROR]: not enough arguements passed");
-        println!("[USAGE]: pseudo <filename> [-o <output_name>]");
-        process::exit(1);
+        cli_error("not enough arguements passed. See usage using --help");
     }
     let filename = &args[1];
     let mut output_file = None;
     for (i, arg) in args.iter().enumerate() {
         if arg == "-o" {
             if i + 1 >= args.len() {
-                eprintln!("[ERROR]: file output path should be specified after the -o flag");
-                process::exit(1);
+                cli_error("file output path should be specified after the -o flag");
             }
-            output_file = Some(args[i + 1].as_str())
+            output_file = Some(args[i + 1].as_str());
+        } else if arg == "--help" {
+            print_usage();
         }
     }
     //TODO: Check file extension
     let default_name;
     if output_file.is_none() {
-        default_name = filename.splitn(2, '.').next().unwrap_or(&filename);
+        default_name = filename
+            .split('.')
+            .next()
+            .unwrap_or_else(|| cli_error("use the .pseudo extension"));
         output_file = Some(default_name);
     }
-    //TODO: REMOVE THE UNWRAPS AND ACTUALLY HANDLE THE ERROR
-    let source = fs::read_to_string(filename)
-        .map_err(|err| eprintln!("Could not open file: {filename} because of {err}"))
-        .unwrap();
+    let source = match fs::read_to_string(filename) {
+        Ok(contents) => contents,
+        Err(err) => cli_error(&format!("could not open file: {filename} {err}")),
+    };
     let lexer = Lexer::new(filename.to_string(), source);
     let mut parser = parser::Parser::new(lexer);
     let stmts = parser.parse_program();
     let mut code = String::new();
-    codegen::generate_c_code(&mut code, stmts).unwrap();
+    codegen::generate_c_code(&mut code, stmts)
+        .unwrap_or_else(|err| cli_error(&format!("could not generate c code {err}")));
     let c_filename = format!(
         "{}.c",
         output_file.expect("There should be a valid output file here")
     );
-    fs::write(&c_filename, code).unwrap();
+    fs::write(&c_filename, code).unwrap_or_else(|err| {
+        cli_error(&format!("could not write generated c code to file {err}"))
+    });
     let _ = Command::new("cc")
         .arg(&c_filename)
         .arg("-o")

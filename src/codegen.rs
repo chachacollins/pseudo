@@ -20,7 +20,7 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
         }
         Expr::SubprogramCall { .. } => {
             //TODO: Handle return type
-            format!("\"%d\", {}", expr)
+            format!("\"%d\", {expr}")
         }
         Expr::Variable { var_type, name } => match var_type {
             Type::Nat => format!("\"%u\", {name}"),
@@ -84,7 +84,7 @@ fn generate_subprogcall_stmt(sink: &mut impl Write, name: String, args: Vec<Expr
         .map(|arg| arg.to_string())
         .collect::<Vec<String>>()
         .join(", ");
-    writeln!(sink, "{name}({});", args_str)?;
+    writeln!(sink, "{name}({args_str});")?;
     Ok(())
 }
 

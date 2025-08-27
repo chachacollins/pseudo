@@ -23,8 +23,8 @@ impl Expr {
             Expr::I32Number(_) => Type::Int,
             Expr::U32Number(_) => Type::Nat,
             Expr::String(_) => Type::String,
-            Expr::Variable { var_type, .. } => var_type.clone(),
-            Expr::SubprogramCall { return_type, .. } => return_type.clone(),
+            Expr::Variable { var_type, .. } => *var_type,
+            Expr::SubprogramCall { return_type, .. } => *return_type,
         }
     }
 }
@@ -37,7 +37,7 @@ impl std::fmt::Display for Expr {
             Expr::String(s) => write!(f, "\"{s}\""),
             Expr::Variable { name, .. } => write!(f, "{name}"),
             Expr::SubprogramCall { name, args, .. } => {
-                write!(f, "{}(", name)?;
+                write!(f, "{name}(")?;
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -224,8 +224,7 @@ impl Parser {
                             .subprogram_table
                             .get(name)
                             .unwrap()
-                            .return_type
-                            .clone();
+                            .return_type;
 
                         self.get_and_expect(TokenKind::LParen);
                         let args = self.parse_subprog_args();
@@ -236,13 +235,7 @@ impl Parser {
                             return_type,
                         }
                     } else if self.ctx_mut().local_var_table.contains_key(name) {
-                        let var_type = self
-                            .ctx_mut()
-                            .local_var_table
-                            .get(name)
-                            .unwrap()
-                            .var_type
-                            .clone();
+                        let var_type = self.ctx_mut().local_var_table.get(name).unwrap().var_type;
                         Expr::Variable {
                             name: name.to_string(),
                             var_type,
@@ -380,7 +373,7 @@ impl Parser {
             compiler_error!(self.curr_token(), "main function MUST return an integer");
         }
 
-        self.ctx_mut().expected_type = return_type.clone();
+        self.ctx_mut().expected_type = return_type;
 
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
@@ -394,7 +387,7 @@ impl Parser {
             name.clone(),
             SubProgCtx {
                 arity: params.len() as u8,
-                return_type: return_type.clone(),
+                return_type,
             },
         );
         self.ctx_mut().local_var_table.clear();
@@ -482,8 +475,7 @@ impl Parser {
                 .subprogram_table
                 .get(&name)
                 .unwrap()
-                .return_type
-                .clone();
+                .return_type;
 
             self.get_and_expect(TokenKind::LParen);
             let args = self.parse_subprog_args();
