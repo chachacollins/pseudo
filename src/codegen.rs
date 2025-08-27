@@ -26,8 +26,10 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
             Type::Nat => format!("\"%u\", {name}"),
             Type::Int => format!("\"%d\", {name}"),
             Type::String => format!("\"%s\", {name}"),
+            Type::Bool => todo!(),
             Type::Void | Type::Unknown => unreachable!(),
         },
+        Expr::Binary { .. } => todo!(),
     };
     writeln!(sink, "printf({write_value});")?;
     Ok(())
@@ -50,6 +52,7 @@ fn generate_subprogdef_stmt(
         Type::String => write!(sink, "char* ")?,
         Type::Nat => write!(sink, "uint32_t ")?,
         Type::Void => write!(sink, "void ")?,
+        Type::Bool => todo!(),
         Type::Unknown => unreachable!(),
     }
 
@@ -63,6 +66,7 @@ fn generate_subprogdef_stmt(
                 Type::Int => "int32_t",
                 Type::String => "char*",
                 Type::Nat => "uint32_t",
+                Type::Bool => todo!(),
                 Type::Void => unreachable!(),
                 Type::Unknown => unreachable!(),
             };
@@ -88,11 +92,19 @@ fn generate_subprogcall_stmt(sink: &mut impl Write, name: String, args: Vec<Expr
     Ok(())
 }
 
+fn generate_if_stmt(sink: &mut impl Write, expr: Expr, stmts: Vec<Stmts>) -> Result {
+    writeln!(sink, "if ({expr}) {{")?;
+    generate_stmts(sink, stmts)?;
+    writeln!(sink, "}}")?;
+    Ok(())
+}
+
 fn generate_stmts(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
     for stmt in stmts {
         match stmt {
             Stmts::Write(expr) => generate_write_stmt(sink, expr)?,
             Stmts::Return(expr) => generate_return_stmt(sink, expr)?,
+            Stmts::If { expr, stmts } => generate_if_stmt(sink, expr, stmts)?,
             Stmts::SubProgramDef {
                 name,
                 return_type,
