@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum TokenKind {
     //Symbols
     Colon,
@@ -11,6 +11,7 @@ pub enum TokenKind {
 
     //Keywords
     Func,
+    Proc,
     Start,
     Stop,
     Write,
@@ -36,6 +37,7 @@ impl fmt::Display for TokenKind {
             TokenKind::RParen => write!(f, ")"),
             TokenKind::Semicolon => write!(f, ";"),
             TokenKind::Func => write!(f, "func"),
+            TokenKind::Proc => write!(f, "proc"),
             TokenKind::Start => write!(f, "start"),
             TokenKind::Stop => write!(f, "stop"),
             TokenKind::Write => write!(f, "write"),
@@ -51,7 +53,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub filename: String,
@@ -87,6 +89,13 @@ impl Lexer {
         self.source[self.read_pos]
     }
 
+    fn peek_next(&self) -> char {
+        if self.read_pos >= self.source.len() {
+            return '\0';
+        }
+        self.source[self.read_pos + 1]
+    }
+
     fn advance(&mut self) -> char {
         if self.read_pos >= self.source.len() {
             return '\0';
@@ -103,6 +112,13 @@ impl Lexer {
             match c {
                 '\t' | ' ' | '\r' => {
                     let _ = self.advance();
+                }
+                '/' => {
+                    if self.peek_next() == '/' {
+                        while self.peek() != '\n' {
+                            let _ = self.advance();
+                        }
+                    }
                 }
                 '\n' => {
                     self.column = 0;
@@ -128,6 +144,7 @@ impl Lexer {
             "start" => TokenKind::Start,
             "stop" => TokenKind::Stop,
             "func" => TokenKind::Func,
+            "proc" => TokenKind::Proc,
             "int" => TokenKind::Int,
             "nat" => TokenKind::Nat,
             "write" => TokenKind::Write,
