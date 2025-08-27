@@ -7,6 +7,10 @@ pub enum Expr {
     I32Number(i32),
     U32Number(u32),
     String(String),
+    Variable {
+        name: String,
+        var_type: Type,
+    },
     SubprogramCall {
         name: String,
         args: Vec<Expr>,
@@ -19,6 +23,7 @@ impl Expr {
             Expr::I32Number(_) => Type::Int,
             Expr::U32Number(_) => Type::Nat,
             Expr::String(_) => Type::String,
+            Expr::Variable { var_type, .. } => var_type.clone(),
             Expr::SubprogramCall { return_type, .. } => return_type.clone(),
         }
     }
@@ -30,6 +35,7 @@ impl std::fmt::Display for Expr {
             Expr::I32Number(n) => write!(f, "{n}"),
             Expr::U32Number(n) => write!(f, "{n}"),
             Expr::String(s) => write!(f, "\"{s}\""),
+            Expr::Variable { name, .. } => write!(f, "{name}"),
             Expr::SubprogramCall { name, args, .. } => {
                 write!(f, "{}(", name)?;
                 for (i, arg) in args.iter().enumerate() {
@@ -91,10 +97,16 @@ struct SubProgCtx {
     return_type: Type,
 }
 
+struct VarCtx {
+    var_type: Type,
+    mutable: bool,
+}
+
 struct ParserCtx {
     is_subprogram: bool,
     expected_type: Type,
     subprogram_table: HashMap<String, SubProgCtx>,
+    local_var_table: HashMap<String, VarCtx>,
 }
 
 pub struct Parser {
@@ -121,6 +133,7 @@ impl Parser {
             is_subprogram: false,
             expected_type: Type::Unknown,
             subprogram_table: HashMap::new(),
+            local_var_table: HashMap::new(),
         })
     }
 
@@ -222,8 +235,20 @@ impl Parser {
                             args,
                             return_type,
                         }
+                    } else if self.ctx_mut().local_var_table.contains_key(name) {
+                        let var_type = self
+                            .ctx_mut()
+                            .local_var_table
+                            .get(name)
+                            .unwrap()
+                            .var_type
+                            .clone();
+                        Expr::Variable {
+                            name: name.to_string(),
+                            var_type,
+                        }
                     } else {
-                        compiler_error!(self.curr_token(), format!("Unknown {}", token.kind));
+                        compiler_error!(self.curr_token(), format!("unknown {}", token.kind));
                     }
                 }
                 _ => {
@@ -291,7 +316,17 @@ impl Parser {
                     let name = self.get_and_expect_ident();
                     self.get_and_expect(TokenKind::Colon);
                     let param_type = self.parse_type();
-                    params.push(Param { name, param_type });
+                    params.push(Param {
+                        name: name.clone(),
+                        param_type,
+                    });
+                    self.ctx_mut().local_var_table.insert(
+                        name,
+                        VarCtx {
+                            var_type: param_type,
+                            mutable: false,
+                        },
+                    );
                 }
                 TokenKind::Comma => {
                     self.get_and_expect(TokenKind::Comma);
@@ -362,6 +397,7 @@ impl Parser {
                 return_type: return_type.clone(),
             },
         );
+        self.ctx_mut().local_var_table.clear();
         Stmts::SubProgramDef {
             name,
             return_type,
@@ -426,6 +462,7 @@ impl Parser {
                 return_type: Type::Void,
             },
         );
+        self.ctx_mut().local_var_table.clear();
         Stmts::SubProgramDef {
             name,
             return_type: Type::Void,

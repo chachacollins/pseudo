@@ -20,8 +20,14 @@ fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
         }
         Expr::SubprogramCall { .. } => {
             //TODO: Handle return type
-            format!("\"%d\", {}", expr) // Uses Display implementation
+            format!("\"%d\", {}", expr)
         }
+        Expr::Variable { var_type, name } => match var_type {
+            Type::Nat => format!("\"%u\", {name}"),
+            Type::Int => format!("\"%d\", {name}"),
+            Type::String => format!("\"%s\", {name}"),
+            Type::Void | Type::Unknown => unreachable!(),
+        },
     };
     writeln!(sink, "printf({write_value});")?;
     Ok(())
