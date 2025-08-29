@@ -2,6 +2,7 @@ use crate::lexer::{Lexer, Token, TokenKind};
 use std::collections::HashMap;
 use std::iter::Peekable;
 
+//TODO: add all binary operators
 //TODO: use let some thing
 //TODO: Typecheck 1: binary ops 2: return statements 3: func arguements
 
@@ -12,6 +13,10 @@ pub enum Op {
     Or,
     Add,
     Minus,
+    Div,
+    Mult,
+    Mod,
+    And,
 }
 
 impl Op {
@@ -22,6 +27,10 @@ impl Op {
             TokenKind::Or => Op::Or,
             TokenKind::Minus => Op::Minus,
             TokenKind::Plus => Op::Add,
+            TokenKind::Star => Op::Mult,
+            TokenKind::Slash => Op::Div,
+            TokenKind::And => Op::And,
+            TokenKind::Percent => Op::Mod,
             _ => unreachable!(),
         }
     }
@@ -53,12 +62,13 @@ impl Expr {
             Expr::I32Number(_) => Type::Int,
             Expr::U32Number(_) => Type::Nat,
             Expr::String(_) => Type::String,
+            //TODO: check for string types
             Expr::Binary { op, lhs, .. } => match op {
-                Op::Add | Op::Minus => {
+                Op::Add | Op::Minus | Op::Div | Op::Mult | Op::Mod => {
                     let Some(lhs) = lhs else { unreachable!() };
                     lhs.get_type()
                 }
-                Op::Equal | Op::NotEqual | Op::Or => Type::Bool,
+                Op::Equal | Op::NotEqual | Op::Or | Op::And => Type::Bool,
             },
             Expr::Variable { var_type, .. } => *var_type,
             Expr::SubprogramCall { return_type, .. } => *return_type,
@@ -77,9 +87,13 @@ impl std::fmt::Display for Expr {
                 let symbol = match op {
                     Op::Add => "+",
                     Op::Minus => "-",
+                    Op::Div => "/",
+                    Op::Mult => "*",
+                    Op::Mod => "%",
                     Op::Equal => "==",
                     Op::NotEqual => "!=",
                     Op::Or => "||",
+                    Op::And => "&&",
                 };
                 if let Some(lhs) = lhs {
                     write!(f, "{lhs} ")?;
@@ -324,11 +338,15 @@ impl Parser {
             while let Some(token) = self.lexer.peek() {
                 match token.kind {
                     TokenKind::Equal
-                    | TokenKind::Minus
                     | TokenKind::EqualEqual
                     | TokenKind::NotEqual
+                    | TokenKind::Or
+                    | TokenKind::And
                     | TokenKind::Plus
-                    | TokenKind::Or => {
+                    | TokenKind::Minus
+                    | TokenKind::Star
+                    | TokenKind::Slash
+                    | TokenKind::Percent => {
                         let tok = self.lexer.next().unwrap();
                         let op = Op::from(tok.kind);
                         let rhs = self.parse_expression();

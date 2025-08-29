@@ -14,6 +14,9 @@ pub enum TokenKind {
     Not,
     Minus,
     Plus,
+    Slash,
+    Percent,
+    Star,
 
     //Keywords
     Func,
@@ -22,6 +25,7 @@ pub enum TokenKind {
     Stop,
     Write,
     Return,
+    And,
     If,
     Else,
     End,
@@ -45,10 +49,14 @@ impl fmt::Display for TokenKind {
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Comma => write!(f, ","),
             TokenKind::Minus => write!(f, "-"),
+            TokenKind::Star => write!(f, "*"),
+            TokenKind::Percent => write!(f, "%"),
+            TokenKind::Slash => write!(f, "/"),
             TokenKind::Plus => write!(f, "+"),
             TokenKind::LParen => write!(f, "("),
             TokenKind::RParen => write!(f, ")"),
             TokenKind::Semicolon => write!(f, ";"),
+            TokenKind::And => write!(f, "and"),
             TokenKind::Func => write!(f, "func"),
             TokenKind::Not => write!(f, "!"),
             TokenKind::Or => write!(f, "or"),
@@ -140,6 +148,8 @@ impl Lexer {
                         while self.peek() != '\n' {
                             let _ = self.advance();
                         }
+                    } else {
+                        break;
                     }
                 }
                 '\n' => {
@@ -170,6 +180,7 @@ impl Lexer {
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "or" => TokenKind::Or,
+            "and" => TokenKind::And,
             "then" => TokenKind::Then,
             "end" => TokenKind::End,
             "int" => TokenKind::Int,
@@ -186,6 +197,9 @@ impl Lexer {
         match c {
             ':' => self.make_token(TokenKind::Colon),
             ';' => self.make_token(TokenKind::Semicolon),
+            '/' => self.make_token(TokenKind::Slash),
+            '*' => self.make_token(TokenKind::Star),
+            '%' => self.make_token(TokenKind::Percent),
             ',' => self.make_token(TokenKind::Comma),
             '(' => self.make_token(TokenKind::LParen),
             ')' => self.make_token(TokenKind::RParen),

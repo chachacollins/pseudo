@@ -32,6 +32,7 @@ fn compile_c_code(ctx: CompilerCtx) {
     args.push(ctx.c_file_path);
     args.push("-o");
     args.push(ctx.output_path);
+    //TODO: check the return status of this
     let _ = Command::new("cc")
         .args(args)
         .output()
