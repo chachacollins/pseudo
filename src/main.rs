@@ -11,58 +11,103 @@ fn cli_error(msg: &str) -> ! {
     process::exit(1)
 }
 
+//TODO: ADD ALL THE OPTIONS
 fn print_usage() {
-    println!("[USAGE]: pseudo <input> [-o <output>]");
+    println!("[USAGE]: pseudo <input> [-o <output>] [OPTIONS]");
+}
+
+#[derive(Default)]
+struct CompilerCtx<'a> {
+    c_file_path: &'a str,
+    output_path: &'a str,
+    optimize: bool,
+    keep_ir_output: bool,
+}
+
+fn compile_c_code(ctx: CompilerCtx) {
+    let mut args = Vec::new();
+    if ctx.optimize {
+        args.push("-O3");
+    }
+    args.push(ctx.c_file_path);
+    args.push("-o");
+    args.push(ctx.output_path);
+    let _ = Command::new("cc")
+        .args(args)
+        .output()
+        .expect("Failed to compile the c program {c_filename}");
+    if !ctx.keep_ir_output {
+        fs::remove_file(ctx.c_file_path).expect("Failed to remove {c_filename}");
+    }
 }
 
 fn main() {
-    let args = env::args().collect::<Vec<String>>();
-    if args.len() < 2 {
+    let args = env::args().skip(1).collect::<Vec<String>>();
+
+    if args.len() < 1 {
         cli_error("not enough arguements passed. See usage using --help");
     }
-    let filename = &args[1];
-    let mut output_file = None;
+    let mut compiler_ctx = CompilerCtx::default();
+
+    let input_file_path = &args[0];
+    let mut output_file_path = None;
+
+    let args = &args[1..];
+    //NOTE: THIS SKIP STUFF IS SUPER UGLY MAYBE CHANGE IT LATER
+    let mut skip = 0;
     for (i, arg) in args.iter().enumerate() {
-        if arg == "-o" {
-            if i + 1 >= args.len() {
-                cli_error("file output path should be specified after the -o flag");
+        match arg.as_str() {
+            "-o" => {
+                if i + 1 >= args.len() {
+                    cli_error("file output path should be specified after the -o flag");
+                }
+                output_file_path = Some(args[i + 1].as_str());
+                skip = i + 1;
             }
-            output_file = Some(args[i + 1].as_str());
-        } else if arg == "--help" {
-            print_usage();
+            "--help" => {
+                print_usage();
+            }
+            "--optimize" => {
+                compiler_ctx.optimize = true;
+            }
+            "--keep" => {
+                compiler_ctx.keep_ir_output = true;
+            }
+            arg => {
+                if skip == i {
+                    continue;
+                }
+                cli_error(&format!("Unknown arguement {arg} provided. See --help"));
+            }
         }
     }
     //TODO: Check file extension
-    let default_name;
-    if output_file.is_none() {
-        default_name = filename
-            .split('.')
-            .next()
-            .unwrap_or_else(|| cli_error("use the .pseudo extension"));
-        output_file = Some(default_name);
+    if output_file_path.is_none() {
+        output_file_path = Some(
+            input_file_path
+                .split('.')
+                .next()
+                .unwrap_or_else(|| cli_error("use the .pseudo extension")),
+        );
     }
-    let source = match fs::read_to_string(filename) {
+    let source = match fs::read_to_string(input_file_path) {
         Ok(contents) => contents,
-        Err(err) => cli_error(&format!("could not open file: {filename} {err}")),
+        Err(err) => cli_error(&format!("could not open file: {input_file_path} {err}")),
     };
-    let lexer = Lexer::new(filename.to_string(), source);
+    let lexer = Lexer::new(input_file_path.to_string(), source);
     let mut parser = parser::Parser::new(lexer);
     let stmts = parser.parse_program();
     let mut code = String::new();
     codegen::generate_c_code(&mut code, stmts)
         .unwrap_or_else(|err| cli_error(&format!("could not generate c code {err}")));
-    let c_filename = format!(
+    let c_file_path = format!(
         "{}.c",
-        output_file.expect("There should be a valid output file here")
+        output_file_path.expect("There should be a valid output file here")
     );
-    fs::write(&c_filename, code).unwrap_or_else(|err| {
+    fs::write(&c_file_path, code).unwrap_or_else(|err| {
         cli_error(&format!("could not write generated c code to file {err}"))
     });
-    let _ = Command::new("cc")
-        .arg(&c_filename)
-        .arg("-o")
-        .arg(output_file.expect("There should be a valid file path here"))
-        .output()
-        .expect("Failed to compile the c program {c_filename}");
-    fs::remove_file(c_filename).expect("Failed to remove {c_filename}");
+    compiler_ctx.c_file_path = &c_file_path;
+    compiler_ctx.output_path = output_file_path.expect("There should be a valid output file here");
+    compile_c_code(compiler_ctx);
 }
