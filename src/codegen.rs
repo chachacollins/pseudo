@@ -99,12 +99,20 @@ fn generate_if_stmt(sink: &mut impl Write, expr: Expr, stmts: Vec<Stmts>) -> Res
     Ok(())
 }
 
+fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
+    writeln!(sink, "}}")?;
+    writeln!(sink, "else {{")?;
+    generate_stmts(sink, stmts)?;
+    Ok(())
+}
+
 fn generate_stmts(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
     for stmt in stmts {
         match stmt {
             Stmts::Write(expr) => generate_write_stmt(sink, expr)?,
             Stmts::Return(expr) => generate_return_stmt(sink, expr)?,
             Stmts::If { expr, stmts } => generate_if_stmt(sink, expr, stmts)?,
+            Stmts::Else(stmts) => generate_else_stmt(sink, stmts)?,
             Stmts::SubProgramDef {
                 name,
                 return_type,

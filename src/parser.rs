@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 
 //TODO: use let some thing
+//TODO: Typecheck 1: binary ops 2: return statements 3: func arguements
 
 #[derive(Debug)]
 pub enum Op {
@@ -133,6 +134,7 @@ pub enum Stmts {
         expr: Expr,
         stmts: Vec<Stmts>,
     },
+    Else(Vec<Stmts>),
     SubProgramCall {
         name: String,
         args: Vec<Expr>,
@@ -147,6 +149,15 @@ macro_rules! compiler_error {
             $token.filename, $token.row, $token.column, $error_msg
         );
         std::process::exit(1);
+    };
+}
+
+macro_rules! compiler_warning {
+    ($token:expr, $error_msg:expr) => {
+        eprintln!(
+            "{}:{}:{}: \x1b[38mwarning:\x1b[0m {}",
+            $token.filename, $token.row, $token.column, $error_msg
+        );
     };
 }
 
@@ -377,6 +388,12 @@ impl Parser {
         Stmts::If { expr, stmts }
     }
 
+    //TODO: Ensure it is within an if block
+    fn parse_else_stmt(&mut self) -> Stmts {
+        let stmts = self.parse_statements();
+        Stmts::Else(stmts)
+    }
+
     fn parse_write_stmt(&mut self) -> Stmts {
         self.get_and_expect(TokenKind::LParen);
         let curr_type = self.ctx_mut().expected_type;
@@ -474,10 +491,11 @@ impl Parser {
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::Stop);
-        let has_return = stmts.iter().any(|stmt| matches!(stmt, Stmts::Return(_)));
-        if !has_return {
-            compiler_error!(self.curr_token(), "each function must have a return value");
-        }
+        //TODO: Check return value
+        // let has_return = stmts.iter().any(|stmt| matches!(stmt, Stmts::Return(_)));
+        // if !has_return {
+        //     compiler_error!(self.curr_token(), "each function must have a return value");
+        // }
         self.ctx_mut().is_subprogram = false;
         self.ctx_mut().local_var_table.clear();
         Stmts::SubProgramDef {
@@ -597,6 +615,7 @@ impl Parser {
                 TokenKind::Proc => statements.push(self.parse_proc_stmt()),
                 TokenKind::Return => statements.push(self.parse_return_stmt()),
                 TokenKind::If => statements.push(self.parse_if_stmt()),
+                TokenKind::Else => statements.push(self.parse_else_stmt()),
                 TokenKind::Ident(_) => {
                     if let Some(token) = self.lexer.peek() {
                         match token.kind {
