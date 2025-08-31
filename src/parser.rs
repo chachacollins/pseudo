@@ -128,6 +128,19 @@ pub enum Type {
     Unknown,
 }
 
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Type::Nat => write!(f, "uint32_t"),
+            Type::String => write!(f, "char*"),
+            Type::Int => write!(f, "int32_t"),
+            Type::Bool => write!(f, "bool"),
+            Type::Void => write!(f, "void"),
+            Type::Unknown => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Param {
     pub param_type: Type,
@@ -138,6 +151,11 @@ pub struct Param {
 pub enum Stmts {
     Write(Expr),
     Return(Expr),
+    Set {
+        name: String,
+        var_type: Type,
+        expr: Expr,
+    },
     SubProgramDef {
         name: String,
         return_type: Type,
@@ -242,7 +260,7 @@ impl Parser {
         }
     }
 
-    fn get_and_expect_ident(&mut self) -> String {
+    fn get_and_return_ident(&mut self) -> String {
         if let Some(token) = self.lexer.next() {
             match token.kind {
                 TokenKind::Ident(name) => name,
@@ -423,13 +441,36 @@ impl Parser {
         Stmts::Write(expr)
     }
 
+    //TODO: INSERT INTO LOCAL VAR TABLE AND TYPE CHECKING
+    fn parse_set_stmt(&mut self) -> Stmts {
+        let name = self.get_and_return_ident();
+        self.get_and_expect(TokenKind::Colon);
+        let var_type = self.parse_type();
+        self.get_and_expect(TokenKind::Equal);
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Semicolon);
+
+        self.ctx_mut().local_var_table.insert(
+            name.clone(),
+            VarCtx {
+                var_type,
+                mutable: false,
+            },
+        );
+        Stmts::Set {
+            name,
+            var_type,
+            expr,
+        }
+    }
+
     fn parse_params(&mut self) -> Vec<Param> {
         let mut params = Vec::new();
         while let Some(token) = self.lexer.peek() {
             match token.kind {
                 TokenKind::RParen => break,
                 TokenKind::Ident(_) => {
-                    let name = self.get_and_expect_ident();
+                    let name = self.get_and_return_ident();
                     self.get_and_expect(TokenKind::Colon);
                     let param_type = self.parse_type();
                     params.push(Param {
@@ -467,7 +508,7 @@ impl Parser {
             );
         }
         self.ctx_mut().is_subprogram = true;
-        let name = self.get_and_expect_ident();
+        let name = self.get_and_return_ident();
 
         if self.ctx_mut().subprogram_table.contains_key(&name) {
             compiler_error!(
@@ -547,7 +588,7 @@ impl Parser {
             );
         }
         self.ctx_mut().is_subprogram = true;
-        let name = self.get_and_expect_ident();
+        let name = self.get_and_return_ident();
 
         if self.ctx_mut().subprogram_table.contains_key(&name) {
             compiler_error!(
@@ -634,7 +675,9 @@ impl Parser {
                 TokenKind::Return => statements.push(self.parse_return_stmt()),
                 TokenKind::If => statements.push(self.parse_if_stmt()),
                 TokenKind::Else => statements.push(self.parse_else_stmt()),
+                TokenKind::Set => statements.push(self.parse_set_stmt()),
                 TokenKind::Ident(_) => {
+                    //TODO:variable as expression error
                     if let Some(token) = self.lexer.peek() {
                         match token.kind {
                             TokenKind::LParen => statements.push(self.parse_subprogcall_stmt()),

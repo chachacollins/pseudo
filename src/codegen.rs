@@ -47,31 +47,12 @@ fn generate_subprogdef_stmt(
     params: Vec<Param>,
     stmts: Vec<Stmts>,
 ) -> Result {
-    match return_type {
-        Type::Int => write!(sink, "int32_t ")?,
-        Type::String => write!(sink, "char* ")?,
-        Type::Nat => write!(sink, "uint32_t ")?,
-        Type::Void => write!(sink, "void ")?,
-        Type::Bool => todo!(),
-        Type::Unknown => unreachable!(),
-    }
-
-    write!(sink, "{name}")?;
+    write!(sink, "{return_type} {name}")?;
 
     write!(sink, "(")?;
     let param_strings: Vec<String> = params
         .iter()
-        .map(|param| {
-            let type_str = match param.param_type {
-                Type::Int => "int32_t",
-                Type::String => "char*",
-                Type::Nat => "uint32_t",
-                Type::Bool => todo!(),
-                Type::Void => unreachable!(),
-                Type::Unknown => unreachable!(),
-            };
-            format!("{} {}", type_str, param.name)
-        })
+        .map(|param| format!("{} {}", param.param_type, param.name))
         .collect();
     write!(sink, "{}", param_strings.join(", "))?;
     write!(sink, ")")?;
@@ -106,6 +87,11 @@ fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
     Ok(())
 }
 
+fn generate_set_stmt(sink: &mut impl Write, name: String, var_type: Type, expr: Expr) -> Result {
+    writeln!(sink, "{var_type} {name} = {expr};")?;
+    Ok(())
+}
+
 fn generate_stmts(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
     for stmt in stmts {
         match stmt {
@@ -122,6 +108,11 @@ fn generate_stmts(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
             Stmts::SubProgramCall { name, args, .. } => {
                 generate_subprogcall_stmt(sink, name, args)?
             }
+            Stmts::Set {
+                name,
+                var_type,
+                expr,
+            } => generate_set_stmt(sink, name, var_type, expr)?,
         }
     }
     Ok(())

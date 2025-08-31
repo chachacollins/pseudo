@@ -17,6 +17,7 @@ pub enum TokenKind {
     Slash,
     Percent,
     Star,
+    Walrus,
 
     //Keywords
     Func,
@@ -31,6 +32,7 @@ pub enum TokenKind {
     End,
     Then,
     Or,
+    Set,
 
     //Types
     Int,
@@ -48,6 +50,7 @@ impl fmt::Display for TokenKind {
         match self {
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Comma => write!(f, ","),
+            TokenKind::Walrus => write!(f, ":="),
             TokenKind::Minus => write!(f, "-"),
             TokenKind::Star => write!(f, "*"),
             TokenKind::Percent => write!(f, "%"),
@@ -70,6 +73,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Proc => write!(f, "proc"),
             TokenKind::Start => write!(f, "start"),
             TokenKind::Stop => write!(f, "stop"),
+            TokenKind::Set => write!(f, "set"),
             TokenKind::Write => write!(f, "write"),
             TokenKind::Return => write!(f, "return"),
             TokenKind::Int => write!(f, "int"),
@@ -175,6 +179,7 @@ impl Lexer {
         match ident {
             "start" => TokenKind::Start,
             "stop" => TokenKind::Stop,
+            "set" => TokenKind::Set,
             "func" => TokenKind::Func,
             "proc" => TokenKind::Proc,
             "if" => TokenKind::If,
@@ -195,7 +200,14 @@ impl Lexer {
         self.skip_whitespace();
         let c = self.advance();
         match c {
-            ':' => self.make_token(TokenKind::Colon),
+            ':' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.make_token(TokenKind::Walrus)
+                } else {
+                    self.make_token(TokenKind::Colon)
+                }
+            }
             ';' => self.make_token(TokenKind::Semicolon),
             '/' => self.make_token(TokenKind::Slash),
             '*' => self.make_token(TokenKind::Star),
