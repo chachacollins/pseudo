@@ -1,8 +1,10 @@
-mod codegen;
+// mod codegen;
 mod lexer;
 mod parser;
+mod semantic;
 
 use lexer::Lexer;
+use semantic::SemanticAnalyzer;
 use std::process::{self, Command};
 use std::{env, fs};
 
@@ -92,21 +94,23 @@ fn main() {
     let lexer = Lexer::new(input_file_path.to_string(), source);
     let mut parser = parser::Parser::new(lexer);
     let stmts = parser.parse_program();
-    let mut code = String::new();
-    codegen::generate_c_code(&mut code, stmts)
-        .unwrap_or_else(|err| cli_error(&format!("could not generate c code {err}")));
-    let c_file_path = format!(
-        "{}.c",
-        output_file_path
-            .as_ref()
-            .expect("There should be a valid output file here")
-    );
-    fs::write(&c_file_path, code).unwrap_or_else(|err| {
-        cli_error(&format!("could not write generated c code to file {err}"))
-    });
-    compiler_ctx.c_file_path = &c_file_path;
-    compiler_ctx.output_path = output_file_path
-        .as_ref()
-        .expect("There should be a valid output file here");
-    compile_c_code(compiler_ctx);
+    let mut semanalyzer = SemanticAnalyzer::new();
+    semanalyzer.analyze_ast(stmts);
+    // let mut code = String::new();
+    // codegen::generate_c_code(&mut code, stmts)
+    //     .unwrap_or_else(|err| cli_error(&format!("could not generate c code {err}")));
+    // let c_file_path = format!(
+    //     "{}.c",
+    //     output_file_path
+    //         .as_ref()
+    //         .expect("There should be a valid output file here")
+    // );
+    // fs::write(&c_file_path, code).unwrap_or_else(|err| {
+    //     cli_error(&format!("could not write generated c code to file {err}"))
+    // });
+    // compiler_ctx.c_file_path = &c_file_path;
+    // compiler_ctx.output_path = output_file_path
+    //     .as_ref()
+    //     .expect("There should be a valid output file here");
+    // compile_c_code(compiler_ctx);
 }
