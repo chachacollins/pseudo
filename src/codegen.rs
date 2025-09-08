@@ -1,4 +1,4 @@
-use crate::parser::{Expr, Param, Stmts, Type};
+use crate::ir::{CType, CValue, Ir};
 use std::fmt::{Result, Write};
 
 fn generate_prelude(sink: &mut impl Write) -> Result {
@@ -7,119 +7,103 @@ fn generate_prelude(sink: &mut impl Write) -> Result {
     Ok(())
 }
 
-fn generate_write_stmt(sink: &mut impl Write, expr: Expr) -> Result {
-    let write_value = match expr {
-        Expr::I32Number(num) => {
-            format!("\"%d\", {num}")
+fn generate_write_stmt(sink: &mut impl Write, ctype: &CType, cvalue: &CValue) -> Result {
+    let write_value = match ctype {
+        CType::Int => {
+            format!("\"%d\", {cvalue}")
         }
-        Expr::U32Number(num) => {
-            format!("\"%u\", {num}")
+        CType::Uint => {
+            format!("\"%u\", {cvalue}")
         }
-        Expr::String(str) => {
-            format!("\"{str}\"")
+        CType::String => {
+            format!("\"%s\", {cvalue}")
         }
-        Expr::SubprogramCall { .. } => {
-            //TODO: Handle return type
-            format!("\"%d\", {expr}")
-        }
-        Expr::Variable { var_type, name } => match var_type {
-            Type::Nat => format!("\"%u\", {name}"),
-            Type::Int => format!("\"%d\", {name}"),
-            Type::String => format!("\"%s\", {name}"),
-            Type::Bool => todo!(),
-            Type::Void | Type::Unknown => unreachable!(),
-        },
-        Expr::Binary { .. } => todo!(),
+        _ => todo!(),
     };
     writeln!(sink, "printf({write_value});")?;
     Ok(())
 }
 
-fn generate_return_stmt(sink: &mut impl Write, expr: Expr) -> Result {
-    writeln!(sink, "return {expr};")?;
+fn generate_return_stmt(sink: &mut impl Write, cvalue: &CValue) -> Result {
+    writeln!(sink, "return {cvalue};")?;
     Ok(())
 }
 
 fn generate_subprogdef_stmt(
     sink: &mut impl Write,
     name: String,
-    return_type: Type,
-    params: Vec<Param>,
-    stmts: Vec<Stmts>,
+    return_type: &CType,
+    rest: &[Ir],
 ) -> Result {
     write!(sink, "{return_type} {name}")?;
 
     write!(sink, "(")?;
-    let param_strings: Vec<String> = params
-        .iter()
-        .map(|param| format!("{} {}", param.param_type, param.name))
-        .collect();
-    write!(sink, "{}", param_strings.join(", "))?;
+    // let param_strings: Vec<String> = params
+    //     .iter()
+    //     .map(|param| format!("{} {}", param.param_type, param.name))
+    //     .collect();
+    // write!(sink, "{}", param_strings.join(", "))?;
     write!(sink, ")")?;
 
     writeln!(sink, "{{")?;
-    generate_stmts(sink, stmts)?;
+    generate_stmts(sink, rest, true)?;
     writeln!(sink, "}}")?;
     Ok(())
 }
 
-fn generate_subprogcall_stmt(sink: &mut impl Write, name: String, args: Vec<Expr>) -> Result {
-    let args_str = args
-        .iter()
-        .map(|arg| arg.to_string())
-        .collect::<Vec<String>>()
-        .join(", ");
-    writeln!(sink, "{name}({args_str});")?;
-    Ok(())
-}
+// fn generate_subprogcall_stmt(sink: &mut impl Write, name: String, args: Vec<Expr>) -> Result {
+//     let args_str = args
+//         .iter()
+//         .map(|arg| arg.to_string())
+//         .collect::<Vec<String>>()
+//         .join(", ");
+//     writeln!(sink, "{name}({args_str});")?;
+//     Ok(())
+// }
+//
+// fn generate_if_stmt(sink: &mut impl Write, expr: Expr, stmts: Vec<Stmts>) -> Result {
+//     writeln!(sink, "if ({expr}) {{")?;
+//     generate_stmts(sink, stmts)?;
+//     writeln!(sink, "}}")?;
+//     Ok(())
+// }
+//
+// fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
+//     writeln!(sink, "}}")?;
+//     writeln!(sink, "else {{")?;
+//     generate_stmts(sink, stmts)?;
+//     Ok(())
+// }
+//
+// fn generate_set_stmt(sink: &mut impl Write, name: String, var_type: Type, expr: Expr) -> Result {
+//     writeln!(sink, "{var_type} {name} = {expr};")?;
+//     Ok(())
+// }
 
-fn generate_if_stmt(sink: &mut impl Write, expr: Expr, stmts: Vec<Stmts>) -> Result {
-    writeln!(sink, "if ({expr}) {{")?;
-    generate_stmts(sink, stmts)?;
-    writeln!(sink, "}}")?;
-    Ok(())
-}
-
-fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
-    writeln!(sink, "}}")?;
-    writeln!(sink, "else {{")?;
-    generate_stmts(sink, stmts)?;
-    Ok(())
-}
-
-fn generate_set_stmt(sink: &mut impl Write, name: String, var_type: Type, expr: Expr) -> Result {
-    writeln!(sink, "{var_type} {name} = {expr};")?;
-    Ok(())
-}
-
-fn generate_stmts(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
-    for stmt in stmts {
+fn generate_stmts(sink: &mut impl Write, stmts: &[Ir], is_function: bool) -> Result {
+    for (i, stmt) in stmts.into_iter().enumerate() {
         match stmt {
-            Stmts::Write(expr) => generate_write_stmt(sink, expr)?,
-            Stmts::Return(expr) => generate_return_stmt(sink, expr)?,
-            Stmts::If { expr, stmts } => generate_if_stmt(sink, expr, stmts)?,
-            Stmts::Else(stmts) => generate_else_stmt(sink, stmts)?,
-            Stmts::SubProgramDef {
-                name,
-                return_type,
-                params,
-                stmts,
-            } => generate_subprogdef_stmt(sink, name, return_type, params, stmts)?,
-            Stmts::SubProgramCall { name, args, .. } => {
-                generate_subprogcall_stmt(sink, name, args)?
+            Ir::Write(ctype, cvalue) => {
+                if is_function {
+                    generate_write_stmt(sink, ctype, cvalue)?
+                }
             }
-            Stmts::Set {
-                name,
-                var_type,
-                expr,
-            } => generate_set_stmt(sink, name, var_type, expr)?,
+            Ir::Return(cvalue) => {
+                if is_function {
+                    generate_return_stmt(sink, cvalue)?
+                }
+            }
+            Ir::SubProgDef(name, ctype) => {
+                generate_subprogdef_stmt(sink, name.to_string(), ctype, &stmts[i + 1..])?;
+            }
+            _ => todo!(),
         }
     }
     Ok(())
 }
 
-pub fn generate_c_code(sink: &mut impl Write, program: Vec<Stmts>) -> Result {
+pub fn generate_c_code(sink: &mut impl Write, ir: Vec<Ir>) -> Result {
     generate_prelude(sink)?;
-    generate_stmts(sink, program)?;
+    generate_stmts(sink, &ir, false)?;
     Ok(())
 }
