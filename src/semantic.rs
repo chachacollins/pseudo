@@ -1,4 +1,3 @@
-use crate::ir::{CType, CValue, Ir};
 use crate::parser::{AstNode, Expr, Position, Stmts, Type};
 use std::collections::HashMap;
 
@@ -25,7 +24,6 @@ pub struct SemanticAnalyzer {
     subprogram_table: HashMap<String, SubProgCtx>,
     local_var_table: HashMap<String, VarCtx>,
     errors: Vec<SemError>,
-    pub ir: Vec<Ir>,
 }
 
 impl SemanticAnalyzer {
@@ -36,11 +34,10 @@ impl SemanticAnalyzer {
             subprogram_table: HashMap::new(),
             local_var_table: HashMap::new(),
             errors: Vec::new(),
-            ir: Vec::new(),
         }
     }
-    pub fn analyze_ast(self: &mut Self, ast: Vec<AstNode<Stmts>>) {
-        for node in &ast {
+    pub fn analyze_ast(self: &mut Self, ast: &mut [AstNode<Stmts>]) {
+        for node in ast.iter_mut() {
             match &node.value {
                 Stmts::SubProgramDef {
                     name,
@@ -161,39 +158,16 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn to_c_type(self: &Self, type_: Type) -> CType {
-        match type_ {
-            Type::Nat => CType::Uint,
-            Type::String => CType::String,
-            Type::Int => CType::Int,
-            Type::Unknown => unreachable!(),
-            _ => todo!(),
-        }
-    }
-
-    fn to_c_value(self: &Self, expr: Expr, _type_: Type) -> CValue {
-        match expr {
-            Expr::String(str) => CValue::StringLiteral(str),
-            //TODO: Actually implement this
-            Expr::Number(num) => CValue::IntLiteral(num as i32),
-            _ => todo!(),
-        }
-    }
-
-    fn analyze_stmt(self: &mut Self, node: AstNode<Stmts>) {
-        match node.value {
-            Stmts::Write(expr_node) => {
-                let gotten_type = self.analyze_expr(&expr_node, Type::Unknown);
-                let ctype = self.to_c_type(gotten_type);
-                let cvalue = self.to_c_value(expr_node.value, gotten_type);
-                self.ir.push(Ir::Write(ctype, cvalue))
+    fn analyze_stmt(self: &mut Self, node: &mut AstNode<Stmts>) {
+        match &mut node.value {
+            Stmts::Write { type_, expr } => {
+                let gotten_type = self.analyze_expr(&expr, Type::Unknown);
+                *type_ = Some(gotten_type);
             }
-            Stmts::Return(expr_node) => {
+            Stmts::Return { return_type, expr } => {
                 //TODO: Check if it matches function return type
-                let gotten_type = self.analyze_expr(&expr_node, Type::Unknown);
-                let ctype = self.to_c_type(gotten_type);
-                let cvalue = self.to_c_value(expr_node.value, gotten_type);
-                self.ir.push(Ir::Return(cvalue))
+                let gotten_type = self.analyze_expr(&expr, Type::Unknown);
+                *return_type = Some(gotten_type);
             }
             Stmts::Set { .. } => todo!(),
             Stmts::SubProgramDef {
@@ -202,11 +176,9 @@ impl SemanticAnalyzer {
                 stmts,
                 ..
             } => {
-                self.expected_return_type = return_type;
+                self.expected_return_type = *return_type;
                 //TODO: Check if name exists
-                let ctype = self.to_c_type(return_type);
-                self.ir.push(Ir::SubProgDef(name, ctype));
-                for stmt in stmts {
+                for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
             }

@@ -1,12 +1,10 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-#![allow(unused_imports)]
 mod codegen;
 mod ir;
 mod lexer;
 mod parser;
 mod semantic;
 
+use crate::ir::CirGenerator;
 use lexer::Lexer;
 use semantic::SemanticAnalyzer;
 use std::process::{self, Command};
@@ -97,12 +95,13 @@ fn main() {
     };
     let lexer = Lexer::new(input_file_path.to_string(), source);
     let mut parser = parser::Parser::new(lexer);
-    let stmts = parser.parse_program();
+    let mut ast = parser.parse_program();
     let mut semanalyzer = SemanticAnalyzer::new();
-    semanalyzer.analyze_ast(stmts);
+    semanalyzer.analyze_ast(&mut ast);
     let mut code = String::new();
-    dbg!(&semanalyzer.ir);
-    codegen::generate_c_code(&mut code, semanalyzer.ir)
+    let ir_generator = CirGenerator::new();
+    let ir = ir_generator.generate_cir(ast);
+    codegen::generate_c_code(&mut code, ir)
         .unwrap_or_else(|err| cli_error(&format!("could not generate c code {err}")));
     let c_file_path = format!(
         "{}.c",

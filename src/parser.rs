@@ -4,6 +4,7 @@ use std::iter::Peekable;
 //TODO: add all binary operators
 //TODO: use let some thing
 //TODO: Typecheck 1: binary ops 2: return statements 3: func arguements
+//TODO: Improve error messages
 
 #[derive(Debug)]
 pub enum Op {
@@ -50,67 +51,6 @@ pub enum Expr {
         rhs: Option<Box<AstNode<Expr>>>,
     },
 }
-// impl Expr {
-//     pub fn get_type(&self) -> Type {
-//         match self {
-//             Expr::I32Number(_) => Type::Int,
-//             Expr::U32Number(_) => Type::Nat,
-//             Expr::String(_) => Type::String,
-//             //TODO: check for string types
-//             Expr::Binary { op, lhs, .. } => match op {
-//                 Op::Add | Op::Minus | Op::Div | Op::Mult | Op::Mod => {
-//                     let Some(lhs) = lhs else { unreachable!() };
-//                     lhs.get_type()
-//                 }
-//                 Op::Equal | Op::NotEqual | Op::Or | Op::And => Type::Bool,
-//             },
-//             Expr::Variable { var_type, .. } => *var_type,
-//             Expr::SubprogramCall { return_type, .. } => *return_type,
-//         }
-//     }
-// }
-
-// impl std::fmt::Display for Expr {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Expr::I32Number(n) => write!(f, "{n}"),
-//             Expr::U32Number(n) => write!(f, "{n}"),
-//             Expr::String(s) => write!(f, "\"{s}\""),
-//             Expr::Variable { name, .. } => write!(f, "{name}"),
-//             Expr::Binary { op, lhs, rhs } => {
-//                 let symbol = match op {
-//                     Op::Add => "+",
-//                     Op::Minus => "-",
-//                     Op::Div => "/",
-//                     Op::Mult => "*",
-//                     Op::Mod => "%",
-//                     Op::Equal => "==",
-//                     Op::NotEqual => "!=",
-//                     Op::Or => "||",
-//                     Op::And => "&&",
-//                 };
-//                 if let Some(lhs) = lhs {
-//                     write!(f, "{lhs} ")?;
-//                 }
-//                 write!(f, "{symbol}")?;
-//                 if let Some(rhs) = rhs {
-//                     write!(f, " {rhs}")?;
-//                 }
-//                 Ok(())
-//             }
-//             Expr::SubprogramCall { name, args, .. } => {
-//                 write!(f, "{name}(")?;
-//                 for (i, arg) in args.iter().enumerate() {
-//                     if i > 0 {
-//                         write!(f, ", ")?;
-//                     }
-//                     write!(f, "{arg}")?;
-//                 }
-//                 write!(f, ")")
-//             }
-//         }
-//     }
-// }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Type {
@@ -143,8 +83,14 @@ pub struct Param {
 
 #[derive(Debug)]
 pub enum Stmts {
-    Write(AstNode<Expr>),
-    Return(AstNode<Expr>),
+    Write {
+        type_: Option<Type>, //Filled by sem analysis
+        expr: AstNode<Expr>,
+    },
+    Return {
+        return_type: Option<Type>, //Filled by sem analysis
+        expr: AstNode<Expr>,
+    },
     Set {
         name: String,
         var_type: Type,
@@ -364,7 +310,10 @@ impl Parser {
     fn parse_return_stmt(&mut self) -> Stmts {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
-        Stmts::Return(expr)
+        Stmts::Return {
+            return_type: None,
+            expr,
+        }
     }
 
     fn parse_if_stmt(&mut self) -> Stmts {
@@ -386,7 +335,7 @@ impl Parser {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::RParen);
         self.get_and_expect(TokenKind::Semicolon);
-        Stmts::Write(expr)
+        Stmts::Write { type_: None, expr }
     }
 
     //TODO: INSERT INTO LOCAL VAR TABLE AND TYPE CHECKING

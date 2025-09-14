@@ -1,4 +1,4 @@
-use crate::ir::{CType, CValue, Ir};
+use crate::ir::{CType, CValue, Cir};
 use std::fmt::{Result, Write};
 
 fn generate_prelude(sink: &mut impl Write) -> Result {
@@ -18,7 +18,6 @@ fn generate_write_stmt(sink: &mut impl Write, ctype: &CType, cvalue: &CValue) ->
         CType::String => {
             format!("\"%s\", {cvalue}")
         }
-        _ => todo!(),
     };
     writeln!(sink, "printf({write_value});")?;
     Ok(())
@@ -33,7 +32,7 @@ fn generate_subprogdef_stmt(
     sink: &mut impl Write,
     name: String,
     return_type: &CType,
-    rest: &[Ir],
+    stmts: Vec<Cir>,
 ) -> Result {
     write!(sink, "{return_type} {name}")?;
 
@@ -46,7 +45,7 @@ fn generate_subprogdef_stmt(
     write!(sink, ")")?;
 
     writeln!(sink, "{{")?;
-    generate_stmts(sink, rest, true)?;
+    generate_stmts(sink, stmts)?;
     writeln!(sink, "}}")?;
     Ok(())
 }
@@ -80,30 +79,25 @@ fn generate_subprogdef_stmt(
 //     Ok(())
 // }
 
-fn generate_stmts(sink: &mut impl Write, stmts: &[Ir], is_function: bool) -> Result {
+fn generate_stmts(sink: &mut impl Write, stmts: Vec<Cir>) -> Result {
     for (i, stmt) in stmts.into_iter().enumerate() {
         match stmt {
-            Ir::Write(ctype, cvalue) => {
-                if is_function {
-                    generate_write_stmt(sink, ctype, cvalue)?
-                }
+            Cir::Write(ctype, cvalue) => generate_write_stmt(sink, &ctype, &cvalue)?,
+            Cir::Return(cvalue) => generate_return_stmt(sink, &cvalue)?,
+            Cir::SubProgDef {
+                name,
+                return_type,
+                stmts_cir,
+            } => {
+                generate_subprogdef_stmt(sink, name.to_string(), &return_type, stmts_cir)?;
             }
-            Ir::Return(cvalue) => {
-                if is_function {
-                    generate_return_stmt(sink, cvalue)?
-                }
-            }
-            Ir::SubProgDef(name, ctype) => {
-                generate_subprogdef_stmt(sink, name.to_string(), ctype, &stmts[i + 1..])?;
-            }
-            _ => todo!(),
         }
     }
     Ok(())
 }
 
-pub fn generate_c_code(sink: &mut impl Write, ir: Vec<Ir>) -> Result {
+pub fn generate_c_code(sink: &mut impl Write, ir: Vec<Cir>) -> Result {
     generate_prelude(sink)?;
-    generate_stmts(sink, &ir, false)?;
+    generate_stmts(sink, ir)?;
     Ok(())
 }
