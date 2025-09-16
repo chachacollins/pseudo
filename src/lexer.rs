@@ -166,11 +166,11 @@ impl Lexer {
         }
     }
 
-    fn make_token(&self, token_kind: TokenKind) -> Token {
+    fn make_token(&self, token_kind: TokenKind, start_row: usize, start_col: usize) -> Token {
         Token {
             kind: token_kind,
-            column: self.column,
-            row: self.row,
+            column: start_col,
+            row: start_row,
             filename: self.filename.clone(),
         }
     }
@@ -203,34 +203,34 @@ impl Lexer {
             ':' => {
                 if self.peek() == '=' {
                     self.advance();
-                    self.make_token(TokenKind::Walrus)
+                    self.make_token(TokenKind::Walrus, self.row, self.column)
                 } else {
-                    self.make_token(TokenKind::Colon)
+                    self.make_token(TokenKind::Colon, self.row, self.column)
                 }
             }
-            ';' => self.make_token(TokenKind::Semicolon),
-            '/' => self.make_token(TokenKind::Slash),
-            '*' => self.make_token(TokenKind::Star),
-            '%' => self.make_token(TokenKind::Percent),
-            ',' => self.make_token(TokenKind::Comma),
-            '(' => self.make_token(TokenKind::LParen),
-            ')' => self.make_token(TokenKind::RParen),
+            ';' => self.make_token(TokenKind::Semicolon, self.row, self.column),
+            '/' => self.make_token(TokenKind::Slash, self.row, self.column),
+            '*' => self.make_token(TokenKind::Star, self.row, self.column),
+            '%' => self.make_token(TokenKind::Percent, self.row, self.column),
+            ',' => self.make_token(TokenKind::Comma, self.row, self.column),
+            '(' => self.make_token(TokenKind::LParen, self.row, self.column),
+            ')' => self.make_token(TokenKind::RParen, self.row, self.column),
             '!' => {
                 if self.peek() == '=' {
                     self.advance();
-                    self.make_token(TokenKind::NotEqual)
+                    self.make_token(TokenKind::NotEqual, self.row, self.column)
                 } else {
-                    self.make_token(TokenKind::Not)
+                    self.make_token(TokenKind::Not, self.row, self.column)
                 }
             }
-            '-' => self.make_token(TokenKind::Minus),
-            '+' => self.make_token(TokenKind::Plus),
+            '-' => self.make_token(TokenKind::Minus, self.row, self.column),
+            '+' => self.make_token(TokenKind::Plus, self.row, self.column),
             '=' => {
                 if self.peek() == '=' {
                     self.advance();
-                    self.make_token(TokenKind::EqualEqual)
+                    self.make_token(TokenKind::EqualEqual, self.row, self.column)
                 } else {
-                    self.make_token(TokenKind::Equal)
+                    self.make_token(TokenKind::Equal, self.row, self.column)
                 }
             }
             '0'..='9' => {
@@ -239,26 +239,30 @@ impl Lexer {
                 while self.peek().is_ascii_digit() {
                     num.push(self.advance());
                 }
-                self.make_token(TokenKind::Number(num))
+                self.make_token(TokenKind::Number(num), self.row, self.column)
             }
             'a'..='z' | 'A'..='Z' | '_' => {
+                let start_row = self.row;
+                let start_col = self.column;
                 let mut ident = String::new();
                 ident.push(c);
                 while self.peek().is_alphanumeric() || self.peek() == '_' {
                     ident.push(self.advance());
                 }
-                self.make_token(self.classify_ident(&ident))
+                self.make_token(self.classify_ident(&ident), start_row, start_col)
             }
-            '\0' => self.make_token(TokenKind::Eof),
+            '\0' => self.make_token(TokenKind::Eof, self.row, self.column),
             '"' => {
+                let start_row = self.row;
+                let start_col = self.column - 1; //This is because i'm skipping the quotes
                 let mut string = String::new();
                 while self.peek() != '"' {
                     string.push(self.advance());
                 }
                 let _ = self.advance();
-                self.make_token(TokenKind::String(string))
+                self.make_token(TokenKind::String(string), start_row, start_col)
             }
-            c => self.make_token(TokenKind::Illegal(c)),
+            c => self.make_token(TokenKind::Illegal(c), self.row, self.column),
         }
     }
 }

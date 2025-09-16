@@ -5,6 +5,7 @@ use std::iter::Peekable;
 //TODO: use let some thing
 //TODO: Typecheck 1: binary ops 2: return statements 3: func arguements
 //TODO: Improve error messages
+//TODO: separate ast from parser
 
 #[derive(Debug)]
 pub enum Op {
@@ -174,9 +175,11 @@ impl Parser {
         if let Some(token) = self.lexer.next() {
             if token.kind != token_kind {
                 compiler_error!(
-                    token,
+                    self.curr_token(),
                     format!("expected {} but found {}", token_kind, token.kind)
                 );
+            } else {
+                self.curr_token = Some(token);
             }
         } else {
             compiler_error!(
@@ -311,7 +314,7 @@ impl Parser {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
         Stmts::Return {
-            return_type: None,
+            return_type: Type::Unknown,
             expr,
         }
     }
@@ -335,7 +338,10 @@ impl Parser {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::RParen);
         self.get_and_expect(TokenKind::Semicolon);
-        Stmts::Write { type_: None, expr }
+        Stmts::Write {
+            type_: Type::Unknown,
+            expr,
+        }
     }
 
     //TODO: INSERT INTO LOCAL VAR TABLE AND TYPE CHECKING
@@ -517,7 +523,7 @@ impl Parser {
                             TokenKind::LParen => {
                                 let position = Position::from(&token);
                                 statements.push(AstNode {
-                                    value: self.parse_set_stmt(),
+                                    value: self.parse_subprogcall_stmt(),
                                     position,
                                 });
                             }

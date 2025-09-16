@@ -1,7 +1,6 @@
 use crate::parser::{AstNode, Expr, Position, Stmts, Type};
 use std::collections::HashMap;
 
-#[derive(Debug)]
 struct SubProgCtx {
     param_types: Vec<Type>,
     return_type: Type,
@@ -12,10 +11,19 @@ struct VarCtx {
     mutable: bool,
 }
 
-#[derive(Debug)]
 struct SemError {
     msg: String,
     position: Position,
+}
+
+impl std::fmt::Display for SemError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "{}:{}:{}: \x1b[31merror:\x1b[0m {}",
+            self.position.filename, self.position.row, self.position.column, self.msg
+        )
+    }
 }
 
 pub struct SemanticAnalyzer {
@@ -83,9 +91,20 @@ impl SemanticAnalyzer {
                 _ => continue,
             }
         }
-        //TODO: Ensure main exists
+        if !self.subprogram_table.contains_key("main") {
+            eprintln!("\x1b[31merror:\x1b[0m main function not found");
+            std::process::exit(1);
+        }
+
         for node in ast {
             self.analyze_stmt(node);
+        }
+
+        if !self.errors.is_empty() {
+            self.errors.iter_mut().for_each(|err| {
+                eprintln!("{err}");
+            });
+            std::process::exit(1);
         }
     }
 
@@ -162,12 +181,21 @@ impl SemanticAnalyzer {
         match &mut node.value {
             Stmts::Write { type_, expr } => {
                 let gotten_type = self.analyze_expr(&expr, Type::Unknown);
-                *type_ = Some(gotten_type);
+                *type_ = gotten_type;
             }
             Stmts::Return { return_type, expr } => {
                 //TODO: Check if it matches function return type
                 let gotten_type = self.analyze_expr(&expr, Type::Unknown);
-                *return_type = Some(gotten_type);
+                if gotten_type != self.expected_return_type {
+                    self.errors.push(SemError {
+                        msg: format!(
+                            "Expected return type {:?}, found {:?}",
+                            self.expected_return_type, gotten_type
+                        ),
+                        position: expr.position.clone(),
+                    });
+                }
+                *return_type = gotten_type;
             }
             Stmts::Set { .. } => todo!(),
             Stmts::SubProgramDef {

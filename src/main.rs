@@ -50,7 +50,7 @@ fn compile_c_code(ctx: CompilerCtx) {
 fn main() {
     let args = env::args().skip(1).collect::<Vec<String>>();
 
-    if args.len() < 1 {
+    if args.is_empty() {
         cli_error("not enough arguements passed. See usage using --help");
     }
     let mut compiler_ctx = CompilerCtx::default();
