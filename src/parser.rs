@@ -84,11 +84,11 @@ pub struct Param {
 #[derive(Debug)]
 pub enum Stmts {
     Write {
-        type_: Option<Type>, //Filled by sem analysis
+        type_: Type, //Filled by sem analysis
         expr: AstNode<Expr>,
     },
     Return {
-        return_type: Option<Type>, //Filled by sem analysis
+        return_type: Type, //Filled by sem analysis
         expr: AstNode<Expr>,
     },
     Set {

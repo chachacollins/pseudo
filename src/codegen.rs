@@ -80,7 +80,7 @@ fn generate_subprogdef_stmt(
 // }
 
 fn generate_stmts(sink: &mut impl Write, stmts: Vec<Cir>) -> Result {
-    for (i, stmt) in stmts.into_iter().enumerate() {
+    for stmt in stmts {
         match stmt {
             Cir::Write(ctype, cvalue) => generate_write_stmt(sink, &ctype, &cvalue)?,
             Cir::Return(cvalue) => generate_return_stmt(sink, &cvalue)?,

@@ -1,4 +1,6 @@
+use crate::parser::{AstNode, Expr, Stmts, Type};
 use std::fmt;
+
 #[derive(Debug)]
 pub enum CType {
     Int,
@@ -46,8 +48,75 @@ pub enum CBinaryOp {
     Div,
 }
 #[derive(Debug)]
-pub enum Ir {
+pub enum Cir {
     Write(CType, CValue),
     Return(CValue),
-    SubProgDef(String, CType),
+    SubProgDef {
+        name: String,
+        return_type: CType,
+        stmts_cir: Vec<Cir>,
+    },
+}
+
+pub struct CirGenerator {}
+
+impl CirGenerator {
+    pub fn new() -> CirGenerator {
+        CirGenerator {}
+    }
+    pub fn generate_cir(self: &Self, ast: Vec<AstNode<Stmts>>) -> Vec<Cir> {
+        ast.into_iter()
+            .map(|node| self.generate_stmt_cir(node))
+            .collect()
+    }
+
+    fn to_c_type(self: &Self, type_: Type) -> CType {
+        match type_ {
+            Type::Nat => CType::Uint,
+            Type::String => CType::String,
+            Type::Int => CType::Int,
+            Type::Unknown => unreachable!(),
+            _ => todo!(),
+        }
+    }
+
+    fn to_c_value(self: &Self, expr: Expr, _type_: Type) -> CValue {
+        match expr {
+            Expr::String(str) => CValue::StringLiteral(str),
+            //TODO: Actually implement this
+            Expr::Number(num) => CValue::IntLiteral(num as i32),
+            _ => todo!(),
+        }
+    }
+    fn generate_stmt_cir(self: &Self, node: AstNode<Stmts>) -> Cir {
+        match node.value {
+            Stmts::Write { type_, expr } => {
+                let cvalue = self.to_c_value(expr.value, type_);
+                let ctype = self.to_c_type(type_);
+                Cir::Write(ctype, cvalue)
+            }
+            Stmts::Return { return_type, expr } => {
+                let cvalue = self.to_c_value(expr.value, return_type);
+                Cir::Return(cvalue)
+            }
+            Stmts::SubProgramDef {
+                name,
+                return_type,
+                stmts,
+                ..
+            } => {
+                let return_type = self.to_c_type(return_type);
+                let mut stmts_cir = Vec::new();
+                for stmt in stmts {
+                    stmts_cir.push(self.generate_stmt_cir(stmt));
+                }
+                Cir::SubProgDef {
+                    name,
+                    return_type,
+                    stmts_cir,
+                }
+            }
+            _ => todo!(),
+        }
+    }
 }
