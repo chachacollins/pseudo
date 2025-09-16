@@ -61,10 +61,14 @@ impl SemanticAnalyzer {
                     } else {
                         let is_main = name == "main";
                         if is_main {
-                            //TODO: CHECK FOR PROC
-                            if *return_type != Type::Int {
+                            if *return_type == Type::Void {
                                 self.errors.push(SemError {
-                                    msg: "main function must have return type int".to_string(),
+                                    msg: "main should be a function not a procedure".to_string(),
+                                    position: node.position.clone(),
+                                });
+                            } else if *return_type != Type::Int {
+                                self.errors.push(SemError {
+                                    msg: "main function must have return type Int".to_string(),
                                     position: node.position.clone(),
                                 });
                             }

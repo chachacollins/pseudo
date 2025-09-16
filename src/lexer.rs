@@ -234,12 +234,14 @@ impl Lexer {
                 }
             }
             '0'..='9' => {
+                let start_row = self.row;
+                let start_col = self.column - 1; // Already consumed the first num
                 let mut num = String::new();
                 num.push(c);
                 while self.peek().is_ascii_digit() {
                     num.push(self.advance());
                 }
-                self.make_token(TokenKind::Number(num), self.row, self.column)
+                self.make_token(TokenKind::Number(num), start_row, start_col)
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let start_row = self.row;

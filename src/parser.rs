@@ -175,7 +175,7 @@ impl Parser {
         if let Some(token) = self.lexer.next() {
             if token.kind != token_kind {
                 compiler_error!(
-                    self.curr_token(),
+                    token,
                     format!("expected {} but found {}", token_kind, token.kind)
                 );
             } else {
