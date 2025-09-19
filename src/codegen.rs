@@ -1,4 +1,4 @@
-use crate::ir::{CType, CValue, Cir};
+use crate::ir::{CParam, CType, CValue, Cir};
 use std::fmt::{Result, Write};
 
 fn generate_prelude(sink: &mut impl Write) -> Result {
@@ -31,17 +31,18 @@ fn generate_return_stmt(sink: &mut impl Write, cvalue: &CValue) -> Result {
 fn generate_subprogdef_stmt(
     sink: &mut impl Write,
     name: String,
+    cparams: Vec<CParam>,
     return_type: &CType,
     stmts: Vec<Cir>,
 ) -> Result {
     write!(sink, "{return_type} {name}")?;
 
     write!(sink, "(")?;
-    // let param_strings: Vec<String> = params
-    //     .iter()
-    //     .map(|param| format!("{} {}", param.param_type, param.name))
-    //     .collect();
-    // write!(sink, "{}", param_strings.join(", "))?;
+    let param_strings: Vec<String> = cparams
+        .iter()
+        .map(|param| format!("{} {}", param.param_type, param.name))
+        .collect();
+    write!(sink, "{}", param_strings.join(", "))?;
     write!(sink, ")")?;
 
     writeln!(sink, "{{")?;
@@ -60,12 +61,12 @@ fn generate_subprogdef_stmt(
 //     Ok(())
 // }
 //
-// fn generate_if_stmt(sink: &mut impl Write, expr: Expr, stmts: Vec<Stmts>) -> Result {
-//     writeln!(sink, "if ({expr}) {{")?;
-//     generate_stmts(sink, stmts)?;
-//     writeln!(sink, "}}")?;
-//     Ok(())
-// }
+fn generate_if_stmt(sink: &mut impl Write, expr: CValue, stmts: Vec<Cir>) -> Result {
+    writeln!(sink, "if ({expr}) {{")?;
+    generate_stmts(sink, stmts)?;
+    writeln!(sink, "}}")?;
+    Ok(())
+}
 //
 // fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
 //     writeln!(sink, "}}")?;
@@ -84,12 +85,14 @@ fn generate_stmts(sink: &mut impl Write, stmts: Vec<Cir>) -> Result {
         match stmt {
             Cir::Write(ctype, cvalue) => generate_write_stmt(sink, &ctype, &cvalue)?,
             Cir::Return(cvalue) => generate_return_stmt(sink, &cvalue)?,
+            Cir::If(cvalue, stmts_cir) => generate_if_stmt(sink, cvalue, stmts_cir)?,
             Cir::SubProgDef {
                 name,
                 return_type,
                 stmts_cir,
+                cparams,
             } => {
-                generate_subprogdef_stmt(sink, name.to_string(), &return_type, stmts_cir)?;
+                generate_subprogdef_stmt(sink, name.to_string(), cparams, &return_type, stmts_cir)?;
             }
         }
     }

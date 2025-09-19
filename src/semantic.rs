@@ -175,9 +175,53 @@ impl SemanticAnalyzer {
                     expected_type
                 }
             }
-            Expr::Variable { .. } => todo!(),
-            Expr::SubprogramCall { .. } => todo!(),
-            Expr::Binary { .. } => todo!(),
+            //TODO: get name of variable and check if the type matches
+            Expr::Variable(name) => {
+                if !self.local_var_table.contains_key(name) {
+                    self.errors.push(SemError {
+                        msg: format!("use of unknown variable {name}"),
+                        position: expr.position.clone(),
+                    });
+                    return expected_type;
+                }
+                self.local_var_table.get(name).unwrap().var_type
+            }
+            Expr::SubprogramCall { name, args } => {
+                if !self.subprogram_table.contains_key(name) {
+                    self.errors.push(SemError {
+                        msg: format!("subprogram {name} is not defined"),
+                        position: expr.position.clone(),
+                    });
+                    return expected_type;
+                }
+                //TODO: check arity
+                let arg_types = self.subprogram_table.get(name).unwrap().param_types.clone();
+                for (i, arg) in args.iter().enumerate() {
+                    let _ = self.analyze_expr(arg, arg_types[i]);
+                }
+                self.subprogram_table.get(name).unwrap().return_type
+            }
+            Expr::Binary { lhs, op, rhs } => {
+                let mut lhs_type = expected_type;
+                let mut rhs_type = expected_type;
+                if let Some(lhs) = lhs {
+                    lhs_type = self.analyze_expr(lhs, lhs_type);
+                }
+
+                if let Some(rhs) = rhs {
+                    rhs_type = self.analyze_expr(rhs, rhs_type);
+                }
+                //TODO: make this error better
+                if rhs_type != lhs_type {
+                    self.errors.push(SemError {
+                        msg: format!(
+                            "type mismatch in binary expression lhs:{lhs_type:?} while rhs:{rhs_type:?}"
+                        ),
+                        position: expr.position.clone(),
+                    });
+                }
+                lhs_type
+            }
         }
     }
 
@@ -203,19 +247,34 @@ impl SemanticAnalyzer {
             }
             Stmts::Set { .. } => todo!(),
             Stmts::SubProgramDef {
-                name,
                 return_type,
                 stmts,
+                params,
                 ..
             } => {
                 self.expected_return_type = *return_type;
-                //TODO: Check if name exists
+                for param in params {
+                    self.local_var_table.insert(
+                        param.name.clone(),
+                        VarCtx {
+                            var_type: param.param_type,
+                            mutable: false,
+                        },
+                    );
+                }
+                for stmt in stmts.iter_mut() {
+                    self.analyze_stmt(stmt)
+                }
+                self.local_var_table.clear();
+            }
+            Stmts::SubProgramCall { .. } => todo!(),
+            Stmts::If { expr, stmts } => {
+                //TODO: check if this is type bool
+                let gotten_type = self.analyze_expr(expr, Type::Unknown);
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
             }
-            Stmts::SubProgramCall { .. } => todo!(),
-            Stmts::If { .. } => todo!(),
             Stmts::Else { .. } => todo!(),
         }
     }
