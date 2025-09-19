@@ -1,10 +1,11 @@
 use crate::lexer::{Lexer, Token, TokenKind};
-use std::collections::HashMap;
 use std::iter::Peekable;
 
 //TODO: add all binary operators
 //TODO: use let some thing
 //TODO: Typecheck 1: binary ops 2: return statements 3: func arguements
+//TODO: Improve error messages
+//TODO: separate ast from parser
 
 #[derive(Debug)]
 pub enum Op {
@@ -38,84 +39,18 @@ impl Op {
 
 #[derive(Debug)]
 pub enum Expr {
-    I32Number(i32),
-    U32Number(u32),
+    Number(i128),
     String(String),
-    Variable {
-        name: String,
-        var_type: Type,
-    },
+    Variable(String),
     SubprogramCall {
         name: String,
-        args: Vec<Expr>,
-        return_type: Type,
+        args: Vec<AstNode<Expr>>,
     },
     Binary {
         op: Op,
-        lhs: Option<Box<Expr>>,
-        rhs: Option<Box<Expr>>,
+        lhs: Option<Box<AstNode<Expr>>>,
+        rhs: Option<Box<AstNode<Expr>>>,
     },
-}
-impl Expr {
-    pub fn get_type(&self) -> Type {
-        match self {
-            Expr::I32Number(_) => Type::Int,
-            Expr::U32Number(_) => Type::Nat,
-            Expr::String(_) => Type::String,
-            //TODO: check for string types
-            Expr::Binary { op, lhs, .. } => match op {
-                Op::Add | Op::Minus | Op::Div | Op::Mult | Op::Mod => {
-                    let Some(lhs) = lhs else { unreachable!() };
-                    lhs.get_type()
-                }
-                Op::Equal | Op::NotEqual | Op::Or | Op::And => Type::Bool,
-            },
-            Expr::Variable { var_type, .. } => *var_type,
-            Expr::SubprogramCall { return_type, .. } => *return_type,
-        }
-    }
-}
-
-impl std::fmt::Display for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expr::I32Number(n) => write!(f, "{n}"),
-            Expr::U32Number(n) => write!(f, "{n}"),
-            Expr::String(s) => write!(f, "\"{s}\""),
-            Expr::Variable { name, .. } => write!(f, "{name}"),
-            Expr::Binary { op, lhs, rhs } => {
-                let symbol = match op {
-                    Op::Add => "+",
-                    Op::Minus => "-",
-                    Op::Div => "/",
-                    Op::Mult => "*",
-                    Op::Mod => "%",
-                    Op::Equal => "==",
-                    Op::NotEqual => "!=",
-                    Op::Or => "||",
-                    Op::And => "&&",
-                };
-                if let Some(lhs) = lhs {
-                    write!(f, "{lhs} ")?;
-                }
-                write!(f, "{symbol}")?;
-                if let Some(rhs) = rhs {
-                    write!(f, " {rhs}")?;
-                }
-                Ok(())
-            }
-            Expr::SubprogramCall { name, args, .. } => {
-                write!(f, "{name}(")?;
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{arg}")?;
-                }
-                write!(f, ")")
-            }
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -149,28 +84,33 @@ pub struct Param {
 
 #[derive(Debug)]
 pub enum Stmts {
-    Write(Expr),
-    Return(Expr),
+    Write {
+        type_: Type, //Filled by sem analysis
+        expr: AstNode<Expr>,
+    },
+    Return {
+        return_type: Type, //Filled by sem analysis
+        expr: AstNode<Expr>,
+    },
     Set {
         name: String,
         var_type: Type,
-        expr: Expr,
+        expr: AstNode<Expr>,
     },
     SubProgramDef {
         name: String,
         return_type: Type,
         params: Vec<Param>,
-        stmts: Vec<Stmts>,
+        stmts: Vec<AstNode<Stmts>>,
     },
     If {
-        expr: Expr,
-        stmts: Vec<Stmts>,
+        expr: AstNode<Expr>,
+        stmts: Vec<AstNode<Stmts>>,
     },
-    Else(Vec<Stmts>),
+    Else(Vec<AstNode<Stmts>>),
     SubProgramCall {
         name: String,
-        args: Vec<Expr>,
-        return_type: Type,
+        args: Vec<AstNode<Expr>>,
     },
 }
 
@@ -184,36 +124,32 @@ macro_rules! compiler_error {
     };
 }
 
-macro_rules! compiler_warning {
-    ($token:expr, $error_msg:expr) => {
-        eprintln!(
-            "{}:{}:{}: \x1b[38mwarning:\x1b[0m {}",
-            $token.filename, $token.row, $token.column, $error_msg
-        );
-    };
+#[derive(Debug, Clone)]
+pub struct Position {
+    pub filename: String,
+    pub column: usize,
+    pub row: usize,
 }
 
-struct SubProgCtx {
-    arity: u8,
-    return_type: Type,
+impl Position {
+    fn from(token: &Token) -> Position {
+        Position {
+            filename: token.filename.clone(),
+            column: token.column,
+            row: token.row,
+        }
+    }
 }
 
-struct VarCtx {
-    var_type: Type,
-    mutable: bool,
-}
-
-struct ParserCtx {
-    is_subprogram: bool,
-    expected_type: Type,
-    subprogram_table: HashMap<String, SubProgCtx>,
-    local_var_table: HashMap<String, VarCtx>,
+#[derive(Debug)]
+pub struct AstNode<T> {
+    pub value: T,
+    pub position: Position,
 }
 
 pub struct Parser {
     lexer: Peekable<Lexer>,
     curr_token: Option<Token>,
-    ctx: Option<ParserCtx>,
 }
 
 impl Parser {
@@ -221,21 +157,12 @@ impl Parser {
         Self {
             lexer: lexer.peekable(),
             curr_token: None,
-            ctx: None,
         }
     }
 
-    pub fn parse_program(&mut self) -> Vec<Stmts> {
+    //TODO: INVESTIGATE THIS
+    pub fn parse_program(&mut self) -> Vec<AstNode<Stmts>> {
         self.parse_statements()
-    }
-
-    fn ctx_mut(&mut self) -> &mut ParserCtx {
-        self.ctx.get_or_insert_with(|| ParserCtx {
-            is_subprogram: false,
-            expected_type: Type::Unknown,
-            subprogram_table: HashMap::new(),
-            local_var_table: HashMap::new(),
-        })
     }
 
     fn curr_token(&self) -> &Token {
@@ -251,6 +178,8 @@ impl Parser {
                     token,
                     format!("expected {} but found {}", token_kind, token.kind)
                 );
+            } else {
+                self.curr_token = Some(token);
             }
         } else {
             compiler_error!(
@@ -277,73 +206,50 @@ impl Parser {
     }
 
     //TODO: ADD PRECEDENCE OF SOME KIND
-    fn parse_expression(&mut self) -> Expr {
+    fn parse_expression(&mut self) -> AstNode<Expr> {
         if let Some(token) = self.lexer.next() {
             let mut lhs = match token.kind {
                 TokenKind::Number(ref num) => {
                     let num = num.parse::<i128>().unwrap_or_else(|err| {
                         compiler_error!(
                             token,
-                            format!(
-                                "could not parse {} as a {:?} number because {err}",
-                                token.kind,
-                                self.ctx_mut().expected_type
-                            )
+                            format!("could not parse {} as a  number because {err}", token.kind,)
                         );
                     });
-
-                    if self.ctx_mut().expected_type == Type::Int {
-                        Expr::I32Number(num as i32)
-                    } else if self.ctx_mut().expected_type == Type::Nat {
-                        Expr::U32Number(num as u32)
-                    } else if self.ctx_mut().expected_type == Type::Unknown {
-                        if num >= i32::MIN as i128 && num <= i32::MAX as i128 {
-                            Expr::I32Number(num as i32)
-                        } else if num >= u32::MIN as i128 && num <= u32::MAX as i128 {
-                            Expr::U32Number(num as u32)
-                        } else {
-                            compiler_error!(
-                                token,
-                                format!("could not determine type of {} number", token.kind)
-                            );
-                        }
-                    } else {
-                        compiler_error!(
-                            token,
-                            format!(
-                                "could not parse {} as a {:?} number",
-                                token.kind,
-                                self.ctx_mut().expected_type
-                            )
-                        );
+                    AstNode {
+                        value: Expr::Number(num),
+                        position: Position::from(&token),
                     }
                 }
-                TokenKind::String(str) => Expr::String(str),
+                TokenKind::String(ref str) => AstNode {
+                    value: Expr::String(str.clone()),
+                    position: Position::from(&token),
+                },
                 TokenKind::Ident(ref name) => {
-                    if self.ctx_mut().subprogram_table.contains_key(name) {
-                        let return_type = self
-                            .ctx_mut()
-                            .subprogram_table
-                            .get(name)
-                            .unwrap()
-                            .return_type;
-
-                        self.get_and_expect(TokenKind::LParen);
-                        let args = self.parse_subprog_args();
-                        self.get_and_expect(TokenKind::RParen);
-                        Expr::SubprogramCall {
-                            name: name.to_string(),
-                            args,
-                            return_type,
-                        }
-                    } else if self.ctx_mut().local_var_table.contains_key(name) {
-                        let var_type = self.ctx_mut().local_var_table.get(name).unwrap().var_type;
-                        Expr::Variable {
-                            name: name.to_string(),
-                            var_type,
+                    if let Some(token) = self.lexer.peek() {
+                        if token.kind == TokenKind::LParen {
+                            let position = Position::from(&token);
+                            self.get_and_expect(TokenKind::LParen);
+                            let args = self.parse_subprog_args();
+                            self.get_and_expect(TokenKind::RParen);
+                            AstNode {
+                                value: Expr::SubprogramCall {
+                                    name: name.to_string(),
+                                    args,
+                                },
+                                position,
+                            }
+                        } else {
+                            AstNode {
+                                value: Expr::Variable(name.clone()),
+                                position: Position::from(&token),
+                            }
                         }
                     } else {
-                        compiler_error!(self.curr_token(), format!("unknown {}", token.kind));
+                        AstNode {
+                            value: Expr::Variable(name.clone()),
+                            position: Position::from(&token),
+                        }
                     }
                 }
                 _ => {
@@ -365,13 +271,17 @@ impl Parser {
                     | TokenKind::Star
                     | TokenKind::Slash
                     | TokenKind::Percent => {
+                        let position = Position::from(&token);
                         let tok = self.lexer.next().unwrap();
                         let op = Op::from(tok.kind);
                         let rhs = self.parse_expression();
-                        lhs = Expr::Binary {
-                            op,
-                            lhs: Some(Box::new(lhs)),
-                            rhs: Some(Box::new(rhs)),
+                        lhs = AstNode {
+                            value: Expr::Binary {
+                                op,
+                                lhs: Some(Box::new(lhs)),
+                                rhs: Some(Box::new(rhs)),
+                            },
+                            position,
                         }
                     }
                     _ => break,
@@ -403,17 +313,10 @@ impl Parser {
     fn parse_return_stmt(&mut self) -> Stmts {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
-        if self.ctx_mut().expected_type != expr.get_type() {
-            compiler_error!(
-                self.curr_token().clone(),
-                format!(
-                    "return type mismatch: expected {:?}, found {:?}",
-                    self.ctx_mut().expected_type,
-                    expr.get_type()
-                )
-            );
+        Stmts::Return {
+            return_type: Type::Unknown,
+            expr,
         }
-        Stmts::Return(expr)
     }
 
     fn parse_if_stmt(&mut self) -> Stmts {
@@ -432,13 +335,13 @@ impl Parser {
 
     fn parse_write_stmt(&mut self) -> Stmts {
         self.get_and_expect(TokenKind::LParen);
-        let curr_type = self.ctx_mut().expected_type;
-        self.ctx_mut().expected_type = Type::Unknown;
         let expr = self.parse_expression();
-        self.ctx_mut().expected_type = curr_type;
         self.get_and_expect(TokenKind::RParen);
         self.get_and_expect(TokenKind::Semicolon);
-        Stmts::Write(expr)
+        Stmts::Write {
+            type_: Type::Unknown,
+            expr,
+        }
     }
 
     //TODO: INSERT INTO LOCAL VAR TABLE AND TYPE CHECKING
@@ -450,13 +353,6 @@ impl Parser {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
 
-        self.ctx_mut().local_var_table.insert(
-            name.clone(),
-            VarCtx {
-                var_type,
-                mutable: false,
-            },
-        );
         Stmts::Set {
             name,
             var_type,
@@ -477,13 +373,6 @@ impl Parser {
                         name: name.clone(),
                         param_type,
                     });
-                    self.ctx_mut().local_var_table.insert(
-                        name,
-                        VarCtx {
-                            var_type: param_type,
-                            mutable: false,
-                        },
-                    );
                 }
                 TokenKind::Comma => {
                     self.get_and_expect(TokenKind::Comma);
@@ -501,52 +390,12 @@ impl Parser {
     }
 
     fn parse_func_stmt(&mut self) -> Stmts {
-        if self.ctx_mut().is_subprogram {
-            compiler_error!(
-                self.curr_token(),
-                "cannot define a function within another subprogram"
-            );
-        }
-        self.ctx_mut().is_subprogram = true;
         let name = self.get_and_return_ident();
-
-        if self.ctx_mut().subprogram_table.contains_key(&name) {
-            compiler_error!(
-                self.curr_token(),
-                format!("redefinition of function {}", name)
-            );
-        }
-
-        let is_main_func = name == "main";
-
         self.get_and_expect(TokenKind::LParen);
         let params = self.parse_params();
         self.get_and_expect(TokenKind::RParen);
-
-        if is_main_func && !params.is_empty() {
-            compiler_error!(
-                self.curr_token(),
-                "main function doesn't take any parameters"
-            );
-        }
-
         self.get_and_expect(TokenKind::Colon);
         let return_type = self.parse_type();
-
-        if is_main_func && return_type != Type::Int {
-            compiler_error!(self.curr_token(), "main function MUST return an integer");
-        }
-
-        self.ctx_mut().expected_type = return_type;
-
-        self.ctx_mut().subprogram_table.insert(
-            name.clone(),
-            SubProgCtx {
-                arity: params.len() as u8,
-                return_type,
-            },
-        );
-
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::Stop);
@@ -555,8 +404,6 @@ impl Parser {
         // if !has_return {
         //     compiler_error!(self.curr_token(), "each function must have a return value");
         // }
-        self.ctx_mut().is_subprogram = false;
-        self.ctx_mut().local_var_table.clear();
         Stmts::SubProgramDef {
             name,
             return_type,
@@ -565,7 +412,7 @@ impl Parser {
         }
     }
 
-    fn parse_subprog_args(&mut self) -> Vec<Expr> {
+    fn parse_subprog_args(&mut self) -> Vec<AstNode<Expr>> {
         let mut args = Vec::new();
         while let Some(token) = self.lexer.peek() {
             if token.kind == TokenKind::RParen {
@@ -581,47 +428,13 @@ impl Parser {
     }
 
     fn parse_proc_stmt(&mut self) -> Stmts {
-        if self.ctx_mut().is_subprogram {
-            compiler_error!(
-                self.curr_token(),
-                "cannot define a procedure within another subprogram"
-            );
-        }
-        self.ctx_mut().is_subprogram = true;
         let name = self.get_and_return_ident();
-
-        if self.ctx_mut().subprogram_table.contains_key(&name) {
-            compiler_error!(
-                self.curr_token(),
-                format!("redefinition of subprogram {}", name)
-            );
-        }
-
-        if name == "main" {
-            compiler_error!(
-                self.curr_token(),
-                "main MUST be a function which returns an integer"
-            );
-        }
-
         self.get_and_expect(TokenKind::LParen);
         let params = self.parse_params();
         self.get_and_expect(TokenKind::RParen);
-
-        self.ctx_mut().expected_type = Type::Void;
-
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::Stop);
-        self.ctx_mut().is_subprogram = false;
-        self.ctx_mut().subprogram_table.insert(
-            name.clone(),
-            SubProgCtx {
-                arity: params.len() as u8,
-                return_type: Type::Void,
-            },
-        );
-        self.ctx_mut().local_var_table.clear();
         Stmts::SubProgramDef {
             name,
             return_type: Type::Void,
@@ -635,32 +448,17 @@ impl Parser {
             TokenKind::Ident(ref name) => name.clone(),
             _ => unreachable!(),
         };
-        if self.ctx_mut().subprogram_table.contains_key(&name) {
-            let return_type = self
-                .ctx_mut()
-                .subprogram_table
-                .get(&name)
-                .unwrap()
-                .return_type;
-
-            self.get_and_expect(TokenKind::LParen);
-            let args = self.parse_subprog_args();
-            self.get_and_expect(TokenKind::RParen);
-            self.get_and_expect(TokenKind::Semicolon);
-            Stmts::SubProgramCall {
-                name: name.to_string(),
-                args,
-                return_type,
-            }
-        } else {
-            compiler_error!(
-                self.curr_token(),
-                format!("Unknown {}", self.curr_token().kind)
-            );
+        self.get_and_expect(TokenKind::LParen);
+        let args = self.parse_subprog_args();
+        self.get_and_expect(TokenKind::RParen);
+        self.get_and_expect(TokenKind::Semicolon);
+        Stmts::SubProgramCall {
+            name: name.to_string(),
+            args,
         }
     }
 
-    fn parse_statements(&mut self) -> Vec<Stmts> {
+    fn parse_statements(&mut self) -> Vec<AstNode<Stmts>> {
         let mut statements = Vec::new();
         while let Some(token) = self.lexer.peek() {
             if token.kind == TokenKind::Stop || token.kind == TokenKind::End {
@@ -669,18 +467,67 @@ impl Parser {
             let token = self.lexer.next().unwrap();
             self.curr_token = Some(token);
             match self.curr_token().kind {
-                TokenKind::Write => statements.push(self.parse_write_stmt()),
-                TokenKind::Func => statements.push(self.parse_func_stmt()),
-                TokenKind::Proc => statements.push(self.parse_proc_stmt()),
-                TokenKind::Return => statements.push(self.parse_return_stmt()),
-                TokenKind::If => statements.push(self.parse_if_stmt()),
-                TokenKind::Else => statements.push(self.parse_else_stmt()),
-                TokenKind::Set => statements.push(self.parse_set_stmt()),
+                TokenKind::Write => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_write_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Func => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_func_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Proc => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_proc_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Return => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_return_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::If => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_if_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Else => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_else_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Set => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_set_stmt(),
+                        position,
+                    });
+                }
                 TokenKind::Ident(_) => {
                     //TODO:variable as expression error
                     if let Some(token) = self.lexer.peek() {
                         match token.kind {
-                            TokenKind::LParen => statements.push(self.parse_subprogcall_stmt()),
+                            TokenKind::LParen => {
+                                let position = Position::from(&token);
+                                statements.push(AstNode {
+                                    value: self.parse_subprogcall_stmt(),
+                                    position,
+                                });
+                            }
+                            //TODO: CHANGE THIS ERROR
                             _ => {
                                 compiler_error!(
                                     self.curr_token(),
