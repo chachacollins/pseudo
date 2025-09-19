@@ -68,12 +68,12 @@ fn generate_if_stmt(sink: &mut impl Write, expr: CValue, stmts: Vec<Cir>) -> Res
     Ok(())
 }
 //
-// fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Stmts>) -> Result {
-//     writeln!(sink, "}}")?;
-//     writeln!(sink, "else {{")?;
-//     generate_stmts(sink, stmts)?;
-//     Ok(())
-// }
+fn generate_else_stmt(sink: &mut impl Write, stmts: Vec<Cir>) -> Result {
+    writeln!(sink, "}}")?;
+    writeln!(sink, "else {{")?;
+    generate_stmts(sink, stmts)?;
+    Ok(())
+}
 //
 // fn generate_set_stmt(sink: &mut impl Write, name: String, var_type: Type, expr: Expr) -> Result {
 //     writeln!(sink, "{var_type} {name} = {expr};")?;
@@ -86,6 +86,7 @@ fn generate_stmts(sink: &mut impl Write, stmts: Vec<Cir>) -> Result {
             Cir::Write(ctype, cvalue) => generate_write_stmt(sink, &ctype, &cvalue)?,
             Cir::Return(cvalue) => generate_return_stmt(sink, &cvalue)?,
             Cir::If(cvalue, stmts_cir) => generate_if_stmt(sink, cvalue, stmts_cir)?,
+            Cir::Else(stmts_cir) => generate_else_stmt(sink, stmts_cir)?,
             Cir::SubProgDef {
                 name,
                 return_type,

@@ -82,6 +82,7 @@ pub enum Cir {
         stmts_cir: Vec<Cir>,
     },
     If(CValue, Vec<Cir>),
+    Else(Vec<Cir>),
 }
 
 pub struct CirGenerator {}
@@ -171,7 +172,13 @@ impl CirGenerator {
                 Cir::If(cvalue, stmts_cir)
             }
             Stmts::Set { .. } => todo!(),
-            Stmts::Else(_) => todo!(),
+            Stmts::Else(stmts) => {
+                let mut stmts_cir = Vec::new();
+                for stmt in stmts {
+                    stmts_cir.push(self.generate_stmt_cir(stmt));
+                }
+                Cir::Else(stmts_cir)
+            }
             Stmts::SubProgramCall { .. } => todo!(),
         }
     }

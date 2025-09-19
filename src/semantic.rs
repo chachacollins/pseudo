@@ -275,7 +275,12 @@ impl SemanticAnalyzer {
                     self.analyze_stmt(stmt)
                 }
             }
-            Stmts::Else { .. } => todo!(),
+            //TODO: ensure it is within an if
+            Stmts::Else(stmts) => {
+                for stmt in stmts.iter_mut() {
+                    self.analyze_stmt(stmt)
+                }
+            }
         }
     }
 }
