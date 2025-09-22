@@ -1,5 +1,5 @@
 {
-  description = "Nex flake";
+  description = "Pseudo lang flake";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
   };
@@ -13,6 +13,8 @@
         cargo
         rustfmt
         clippy
+        gnumake
+        fd
       ];
       shellHook = ''
         fish
