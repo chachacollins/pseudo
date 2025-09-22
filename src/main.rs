@@ -13,7 +13,12 @@ use std::{env, fs};
 
 //TODO: ADD ALL THE OPTIONS
 fn print_usage() {
-    println!("[USAGE]: pseudo <input> [-o <output>] [OPTIONS]");
+    println!("[USAGE] : pseudo <input> [-o <output>] [OPTIONS]");
+    println!();
+    println!("[OPTIONS:]");
+    println!("--keep: This keeps the C code that was generated");
+    println!("--help: Prints this help message and exits");
+    println!("--optimize: builds an optimized version of the binary");
 }
 
 fn cli_error(msg: &str) -> ! {
@@ -39,10 +44,13 @@ fn compile_c_code(ctx: CompilerCtx) {
     args.push("-o");
     args.push(ctx.output_path);
     //TODO: check the return status of this
-    let _ = Command::new("cc")
+    let output = Command::new("cc")
         .args(args)
         .output()
         .expect("Failed to compile the c program {c_filename}");
+    if !output.status.success() {
+        cli_error(&format!("{}", String::from_utf8_lossy(&output.stderr)));
+    }
     if !ctx.keep_ir_output {
         fs::remove_file(ctx.c_file_path).expect("Failed to remove {c_filename}");
     }
