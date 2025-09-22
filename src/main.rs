@@ -5,6 +5,7 @@ mod parser;
 mod semantic;
 
 use crate::ir::CirGenerator;
+use codegen::CodeGen;
 use lexer::Lexer;
 use semantic::SemanticAnalyzer;
 use std::process::{self, Command};
@@ -93,15 +94,17 @@ fn main() {
         Ok(contents) => contents,
         Err(err) => cli_error(&format!("could not open file: {input_file_path} {err}")),
     };
+
     let lexer = Lexer::new(input_file_path.to_string(), source);
     let mut parser = parser::Parser::new(lexer);
     let mut ast = parser.parse_program();
     let mut semanalyzer = SemanticAnalyzer::new();
     semanalyzer.analyze_ast(&mut ast);
-    let mut code = String::new();
+    let mut codegen = CodeGen::new();
     let ir_generator = CirGenerator::new();
     let ir = ir_generator.generate_cir(ast);
-    codegen::generate_c_code(&mut code, ir)
+    let code = codegen
+        .generate_c_code(ir)
         .unwrap_or_else(|err| cli_error(&format!("could not generate c code {err}")));
     let c_file_path = format!(
         "{}.c",
