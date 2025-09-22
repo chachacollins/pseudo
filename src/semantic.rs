@@ -204,13 +204,9 @@ impl SemanticAnalyzer {
             Expr::Binary { lhs, op, rhs } => {
                 let mut lhs_type = expected_type;
                 let mut rhs_type = expected_type;
-                if let Some(lhs) = lhs {
-                    lhs_type = self.analyze_expr(lhs, lhs_type);
-                }
+                lhs_type = self.analyze_expr(lhs, lhs_type);
 
-                if let Some(rhs) = rhs {
-                    rhs_type = self.analyze_expr(rhs, rhs_type);
-                }
+                rhs_type = self.analyze_expr(rhs, rhs_type);
                 //TODO: make this error better
                 if rhs_type != lhs_type {
                     self.errors.push(SemError {

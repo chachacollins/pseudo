@@ -48,8 +48,8 @@ pub enum Expr {
     },
     Binary {
         op: Op,
-        lhs: Option<Box<AstNode<Expr>>>,
-        rhs: Option<Box<AstNode<Expr>>>,
+        lhs: Box<AstNode<Expr>>,
+        rhs: Box<AstNode<Expr>>,
     },
 }
 
@@ -278,8 +278,8 @@ impl Parser {
                         lhs = AstNode {
                             value: Expr::Binary {
                                 op,
-                                lhs: Some(Box::new(lhs)),
-                                rhs: Some(Box::new(rhs)),
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
                             },
                             position,
                         }
@@ -344,7 +344,6 @@ impl Parser {
         }
     }
 
-    //TODO: INSERT INTO LOCAL VAR TABLE AND TYPE CHECKING
     fn parse_set_stmt(&mut self) -> Stmts {
         let name = self.get_and_return_ident();
         self.get_and_expect(TokenKind::Colon);

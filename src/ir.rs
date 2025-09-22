@@ -113,9 +113,9 @@ impl CirGenerator {
             //TODO: Actually implement this
             Expr::Number(num) => CValue::IntLiteral(num as i32),
             Expr::Binary { lhs, op, rhs } => CValue::BinaryOp(
-                Box::new(self.to_c_value(lhs.unwrap().value, None)),
+                Box::new(self.to_c_value(lhs.value, None)),
                 op,
-                Box::new(self.to_c_value(rhs.unwrap().value, None)),
+                Box::new(self.to_c_value(rhs.value, None)),
             ),
             Expr::Variable(name) => CValue::Variable(name),
             Expr::SubprogramCall { name, args } => {
