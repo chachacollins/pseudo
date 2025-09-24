@@ -194,6 +194,22 @@ impl Parser {
         }
     }
 
+    fn get_maybe(&mut self, token_kind: TokenKind) -> bool {
+        if let Some(token) = self.lexer.peek() {
+            if token.kind != token_kind {
+                return false;
+            } else {
+                self.get_and_expect(token_kind);
+                return true;
+            }
+        } else {
+            compiler_error!(
+                self.curr_token(),
+                format!("expected {} but found eof", token_kind)
+            );
+        }
+    }
+
     fn get_and_return_ident(&mut self) -> String {
         if let Some(token) = self.lexer.next() {
             match token.kind {
@@ -351,16 +367,16 @@ impl Parser {
 
     fn parse_set_stmt(&mut self) -> Stmts {
         let mut mutable = false;
-        if let Some(token) = self.lexer.peek() {
-            if token.kind == TokenKind::Mut {
-                self.get_and_expect(TokenKind::Mut);
-                mutable = true;
-            }
+        let mut var_type = Type::Unknown;
+        if self.get_maybe(TokenKind::Mut) {
+            mutable = true;
         }
         let name = self.get_and_return_ident();
-        self.get_and_expect(TokenKind::Colon);
-        let var_type = self.parse_type();
-        self.get_and_expect(TokenKind::Equal);
+        if !self.get_maybe(TokenKind::Walrus) {
+            self.get_and_expect(TokenKind::Colon);
+            var_type = self.parse_type();
+            self.get_and_expect(TokenKind::Equal);
+        }
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
 
