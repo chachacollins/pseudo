@@ -95,6 +95,11 @@ pub enum Stmts {
     Set {
         name: String,
         var_type: Type,
+        mutable: bool,
+        expr: AstNode<Expr>,
+    },
+    Assign {
+        name: String,
         expr: AstNode<Expr>,
     },
     SubProgramDef {
@@ -180,6 +185,22 @@ impl Parser {
                 );
             } else {
                 self.curr_token = Some(token);
+            }
+        } else {
+            compiler_error!(
+                self.curr_token(),
+                format!("expected {} but found eof", token_kind)
+            );
+        }
+    }
+
+    fn get_maybe(&mut self, token_kind: TokenKind) -> bool {
+        if let Some(token) = self.lexer.peek() {
+            if token.kind != token_kind {
+                return false;
+            } else {
+                self.get_and_expect(token_kind);
+                return true;
             }
         } else {
             compiler_error!(
@@ -345,10 +366,17 @@ impl Parser {
     }
 
     fn parse_set_stmt(&mut self) -> Stmts {
+        let mut mutable = false;
+        let mut var_type = Type::Unknown;
+        if self.get_maybe(TokenKind::Mut) {
+            mutable = true;
+        }
         let name = self.get_and_return_ident();
-        self.get_and_expect(TokenKind::Colon);
-        let var_type = self.parse_type();
-        self.get_and_expect(TokenKind::Equal);
+        if !self.get_maybe(TokenKind::Walrus) {
+            self.get_and_expect(TokenKind::Colon);
+            var_type = self.parse_type();
+            self.get_and_expect(TokenKind::Equal);
+        }
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Semicolon);
 
@@ -356,7 +384,18 @@ impl Parser {
             name,
             var_type,
             expr,
+            mutable,
         }
+    }
+    fn parse_varassign_stmt(&mut self) -> Stmts {
+        let name = match self.curr_token().kind {
+            TokenKind::Ident(ref name) => name.clone(),
+            _ => unreachable!(),
+        };
+        self.get_and_expect(TokenKind::Equal);
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Semicolon);
+        Stmts::Assign { name, expr }
     }
 
     fn parse_params(&mut self) -> Vec<Param> {
@@ -516,7 +555,6 @@ impl Parser {
                     });
                 }
                 TokenKind::Ident(_) => {
-                    //TODO:variable as expression error
                     if let Some(token) = self.lexer.peek() {
                         match token.kind {
                             TokenKind::LParen => {
@@ -525,6 +563,13 @@ impl Parser {
                                     value: self.parse_subprogcall_stmt(),
                                     position,
                                 });
+                            }
+                            TokenKind::Equal => {
+                                let position = Position::from(&token);
+                                statements.push(AstNode {
+                                    value: self.parse_varassign_stmt(),
+                                    position,
+                                })
                             }
                             //TODO: CHANGE THIS ERROR
                             _ => {
