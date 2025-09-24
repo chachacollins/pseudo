@@ -73,8 +73,17 @@ impl CodeGen {
         name: String,
         var_type: CType,
         expr: CValue,
+        mutable: bool,
     ) -> fmt::Result {
+        if !mutable {
+            write!(self.sink, "const ")?;
+        }
         writeln!(self.sink, "{var_type} {name} = {expr};")?;
+        Ok(())
+    }
+
+    fn generate_varassign_stmt(self: &mut Self, name: String, expr: CValue) -> fmt::Result {
+        writeln!(self.sink, "{name} = {expr};")?;
         Ok(())
     }
 
@@ -105,9 +114,10 @@ impl CodeGen {
                         stmts_cir,
                     )?;
                 }
-                Cir::VariableDef(name, var_type, cvalue) => {
-                    self.generate_set_stmt(name, var_type, cvalue)?
+                Cir::VariableDef(name, var_type, cvalue, mutable) => {
+                    self.generate_set_stmt(name, var_type, cvalue, mutable)?
                 }
+                Cir::VarAssign(name, cvalue) => self.generate_varassign_stmt(name, cvalue)?,
             }
         }
         Ok(())

@@ -33,6 +33,7 @@ pub enum TokenKind {
     Then,
     Or,
     Set,
+    Mut,
 
     //Types
     Int,
@@ -59,6 +60,7 @@ impl fmt::Display for TokenKind {
             TokenKind::LParen => write!(f, "("),
             TokenKind::RParen => write!(f, ")"),
             TokenKind::Semicolon => write!(f, ";"),
+            TokenKind::Mut => write!(f, "mut"),
             TokenKind::And => write!(f, "and"),
             TokenKind::Func => write!(f, "func"),
             TokenKind::Not => write!(f, "!"),
@@ -180,6 +182,7 @@ impl Lexer {
             "start" => TokenKind::Start,
             "stop" => TokenKind::Stop,
             "set" => TokenKind::Set,
+            "mut" => TokenKind::Mut,
             "func" => TokenKind::Func,
             "proc" => TokenKind::Proc,
             "if" => TokenKind::If,

@@ -95,6 +95,11 @@ pub enum Stmts {
     Set {
         name: String,
         var_type: Type,
+        mutable: bool,
+        expr: AstNode<Expr>,
+    },
+    Assign {
+        name: String,
         expr: AstNode<Expr>,
     },
     SubProgramDef {
@@ -345,6 +350,13 @@ impl Parser {
     }
 
     fn parse_set_stmt(&mut self) -> Stmts {
+        let mut mutable = false;
+        if let Some(token) = self.lexer.peek() {
+            if token.kind == TokenKind::Mut {
+                self.get_and_expect(TokenKind::Mut);
+                mutable = true;
+            }
+        }
         let name = self.get_and_return_ident();
         self.get_and_expect(TokenKind::Colon);
         let var_type = self.parse_type();
@@ -356,7 +368,18 @@ impl Parser {
             name,
             var_type,
             expr,
+            mutable,
         }
+    }
+    fn parse_varassign_stmt(&mut self) -> Stmts {
+        let name = match self.curr_token().kind {
+            TokenKind::Ident(ref name) => name.clone(),
+            _ => unreachable!(),
+        };
+        self.get_and_expect(TokenKind::Equal);
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Semicolon);
+        Stmts::Assign { name, expr }
     }
 
     fn parse_params(&mut self) -> Vec<Param> {
@@ -516,7 +539,6 @@ impl Parser {
                     });
                 }
                 TokenKind::Ident(_) => {
-                    //TODO:variable as expression error
                     if let Some(token) = self.lexer.peek() {
                         match token.kind {
                             TokenKind::LParen => {
@@ -525,6 +547,13 @@ impl Parser {
                                     value: self.parse_subprogcall_stmt(),
                                     position,
                                 });
+                            }
+                            TokenKind::Equal => {
+                                let position = Position::from(&token);
+                                statements.push(AstNode {
+                                    value: self.parse_varassign_stmt(),
+                                    position,
+                                })
                             }
                             //TODO: CHANGE THIS ERROR
                             _ => {

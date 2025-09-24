@@ -246,6 +246,7 @@ impl SemanticAnalyzer {
                 name,
                 var_type,
                 expr,
+                mutable,
             } => {
                 if self.local_var_table.contains_key(name) {
                     self.errors.push(SemError {
@@ -259,9 +260,29 @@ impl SemanticAnalyzer {
                     name.clone(),
                     VarCtx {
                         var_type: var_type.clone(),
-                        mutable: false,
+                        mutable: mutable.clone(),
                     },
                 );
+            }
+            Stmts::Assign { name, expr } => {
+                if !self.local_var_table.contains_key(name) {
+                    self.errors.push(SemError {
+                        msg: format!("trying to assing value to unexisting variable: {name}",),
+                        position: node.position.clone(),
+                    });
+                } else {
+                    //TODO: check if we can reassign the variable type for example after type
+                    //inference
+                    let var_ctx = self.local_var_table.get(name).unwrap();
+                    if var_ctx.mutable {
+                        let _ = self.analyze_expr(expr, var_ctx.var_type);
+                    } else {
+                        self.errors.push(SemError {
+                            msg: format!("trying to assing value to immutable variable: {name}",),
+                            position: node.position.clone(),
+                        });
+                    }
+                }
             }
             Stmts::SubProgramDef {
                 return_type,

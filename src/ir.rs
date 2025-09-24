@@ -27,7 +27,6 @@ impl fmt::Display for CType {
 pub enum CValue {
     NumLiteral(i128),
     StringLiteral(String),
-
     Variable(String),
     Temporary(usize),
     BinaryOp(Box<CValue>, Op, Box<CValue>),
@@ -81,7 +80,8 @@ pub enum Cir {
     },
     If(CValue, Vec<Cir>),
     Else(Vec<Cir>),
-    VariableDef(String, CType, CValue),
+    VariableDef(String, CType, CValue, bool),
+    VarAssign(String, CValue),
 }
 
 pub struct CirGenerator {}
@@ -174,10 +174,15 @@ impl CirGenerator {
                 name,
                 expr,
                 var_type,
+                mutable,
             } => {
                 let cvalue = self.to_c_value(expr.value);
                 let ctype = self.to_c_type(var_type);
-                Cir::VariableDef(name, ctype, cvalue)
+                Cir::VariableDef(name, ctype, cvalue, mutable)
+            }
+            Stmts::Assign { name, expr } => {
+                let cvalue = self.to_c_value(expr.value);
+                Cir::VarAssign(name, cvalue)
             }
             Stmts::Else(stmts) => {
                 let mut stmts_cir = Vec::new();
