@@ -112,6 +112,7 @@ impl SemanticAnalyzer {
         }
     }
 
+    //TODO: investigate whether we should return early when we detect errors
     fn analyze_expr(self: &mut Self, expr: &AstNode<Expr>, expected_type: Type) -> Type {
         match &expr.value {
             //TODO: Abstract this into it's own function and change it to use literals
@@ -241,7 +242,27 @@ impl SemanticAnalyzer {
                 }
                 *return_type = gotten_type;
             }
-            Stmts::Set { .. } => todo!(),
+            Stmts::Set {
+                name,
+                var_type,
+                expr,
+            } => {
+                if self.local_var_table.contains_key(name) {
+                    self.errors.push(SemError {
+                        msg: format!("redefinition of variable {name}",),
+                        position: node.position.clone(),
+                    });
+                }
+                let gotten_type = self.analyze_expr(expr, var_type.clone());
+                *var_type = gotten_type;
+                self.local_var_table.insert(
+                    name.clone(),
+                    VarCtx {
+                        var_type: var_type.clone(),
+                        mutable: false,
+                    },
+                );
+            }
             Stmts::SubProgramDef {
                 return_type,
                 stmts,

@@ -68,6 +68,16 @@ impl CodeGen {
         Ok(())
     }
 
+    fn generate_set_stmt(
+        self: &mut Self,
+        name: String,
+        var_type: CType,
+        expr: CValue,
+    ) -> fmt::Result {
+        writeln!(self.sink, "{var_type} {name} = {expr};")?;
+        Ok(())
+    }
+
     fn generate_else_stmt(self: &mut Self, stmts: Vec<Cir>) -> fmt::Result {
         writeln!(self.sink, "}}")?;
         writeln!(self.sink, "else {{")?;
@@ -95,6 +105,9 @@ impl CodeGen {
                         stmts_cir,
                     )?;
                 }
+                Cir::VariableDef(name, var_type, cvalue) => {
+                    self.generate_set_stmt(name, var_type, cvalue)?
+                }
             }
         }
         Ok(())
@@ -119,7 +132,3 @@ impl CodeGen {
 //
 //
 //
-// fn generate_set_stmt(sink: &mut impl Write, name: String, var_type: Type, expr: Expr) -> fmt::Result {
-//     writeln!(sink, "{var_type} {name} = {expr};")?;
-//     Ok(())
-// }

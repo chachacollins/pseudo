@@ -25,8 +25,7 @@ impl fmt::Display for CType {
 }
 #[derive(Debug)]
 pub enum CValue {
-    IntLiteral(i32),
-    UintLiteral(u32),
+    NumLiteral(i128),
     StringLiteral(String),
 
     Variable(String),
@@ -37,8 +36,7 @@ pub enum CValue {
 impl fmt::Display for CValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CValue::IntLiteral(n) => write!(f, "{}", n),
-            CValue::UintLiteral(n) => write!(f, "{}", n),
+            CValue::NumLiteral(n) => write!(f, "{}", n),
             CValue::StringLiteral(s) => write!(f, "\"{}\"", s),
             CValue::Variable(name) => write!(f, "{}", name),
             CValue::Temporary(id) => write!(f, "__tmp_{}", id),
@@ -83,6 +81,7 @@ pub enum Cir {
     },
     If(CValue, Vec<Cir>),
     Else(Vec<Cir>),
+    VariableDef(String, CType, CValue),
 }
 
 pub struct CirGenerator {}
@@ -107,21 +106,21 @@ impl CirGenerator {
         }
     }
 
-    fn to_c_value(self: &Self, expr: Expr, _type_: Option<Type>) -> CValue {
+    fn to_c_value(self: &Self, expr: Expr) -> CValue {
         match expr {
             Expr::String(str) => CValue::StringLiteral(str),
             //TODO: Actually implement this
-            Expr::Number(num) => CValue::IntLiteral(num as i32),
+            Expr::Number(num) => CValue::NumLiteral(num),
             Expr::Binary { lhs, op, rhs } => CValue::BinaryOp(
-                Box::new(self.to_c_value(lhs.value, None)),
+                Box::new(self.to_c_value(lhs.value)),
                 op,
-                Box::new(self.to_c_value(rhs.value, None)),
+                Box::new(self.to_c_value(rhs.value)),
             ),
             Expr::Variable(name) => CValue::Variable(name),
             Expr::SubprogramCall { name, args } => {
                 let mut cvalues = Vec::new();
                 for arg in args {
-                    cvalues.push(self.to_c_value(arg.value, None));
+                    cvalues.push(self.to_c_value(arg.value));
                 }
                 CValue::SubProgCall(name, cvalues)
             }
@@ -130,12 +129,12 @@ impl CirGenerator {
     fn generate_stmt_cir(self: &Self, node: AstNode<Stmts>) -> Cir {
         match node.value {
             Stmts::Write { type_, expr } => {
-                let cvalue = self.to_c_value(expr.value, Some(type_));
+                let cvalue = self.to_c_value(expr.value);
                 let ctype = self.to_c_type(type_);
                 Cir::Write(ctype, cvalue)
             }
-            Stmts::Return { return_type, expr } => {
-                let cvalue = self.to_c_value(expr.value, Some(return_type));
+            Stmts::Return { expr, .. } => {
+                let cvalue = self.to_c_value(expr.value);
                 Cir::Return(cvalue)
             }
             Stmts::SubProgramDef {
@@ -164,14 +163,22 @@ impl CirGenerator {
                 }
             }
             Stmts::If { expr, stmts } => {
-                let cvalue = self.to_c_value(expr.value, None);
+                let cvalue = self.to_c_value(expr.value);
                 let mut stmts_cir = Vec::new();
                 for stmt in stmts {
                     stmts_cir.push(self.generate_stmt_cir(stmt));
                 }
                 Cir::If(cvalue, stmts_cir)
             }
-            Stmts::Set { .. } => todo!(),
+            Stmts::Set {
+                name,
+                expr,
+                var_type,
+            } => {
+                let cvalue = self.to_c_value(expr.value);
+                let ctype = self.to_c_type(var_type);
+                Cir::VariableDef(name, ctype, cvalue)
+            }
             Stmts::Else(stmts) => {
                 let mut stmts_cir = Vec::new();
                 for stmt in stmts {
