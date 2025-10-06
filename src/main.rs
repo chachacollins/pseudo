@@ -27,6 +27,11 @@ fn cli_error(msg: &str) -> ! {
     process::exit(1)
 }
 
+fn compiler_error(msg: &str) -> ! {
+    eprintln!("[ERROR]: {msg}");
+    process::exit(1)
+}
+
 #[derive(Default)]
 struct CompilerCtx<'a> {
     c_file_path: &'a str,
@@ -36,6 +41,14 @@ struct CompilerCtx<'a> {
 }
 
 fn compile_c_code(ctx: CompilerCtx) {
+    let mut libpseudo_path;
+    match env::var_os("LIBPSEUDO") {
+        Some(val) => libpseudo_path = val,
+        None => compiler_error("LIBPSEUDO path variable not set"),
+    }
+    let libpseudo_path = libpseudo_path.into_string().unwrap();
+    let include_path = format!("{}/{}", libpseudo_path, "include");
+    let lib_path = format!("{}/{}", libpseudo_path, "build/libpseudo.a");
     let mut args = Vec::new();
     if ctx.optimize {
         args.push("-O3");
@@ -43,13 +56,15 @@ fn compile_c_code(ctx: CompilerCtx) {
     args.push(ctx.c_file_path);
     args.push("-o");
     args.push(ctx.output_path);
-    //TODO: check the return status of this
+    args.push("-I");
+    args.push(&include_path);
+    args.push(&lib_path);
     let output = Command::new("cc")
         .args(args)
         .output()
         .expect("Failed to compile the c program {c_filename}");
     if !output.status.success() {
-        cli_error(&format!("{}", String::from_utf8_lossy(&output.stderr)));
+        compiler_error(&format!("{}", String::from_utf8_lossy(&output.stderr)));
     }
     if !ctx.keep_ir_output {
         fs::remove_file(ctx.c_file_path).expect("Failed to remove {c_filename}");

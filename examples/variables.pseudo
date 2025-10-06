@@ -1,0 +1,7 @@
+func main(): int
+start
+    set mut x := 10;
+    x = 100;
+    set y := x;
+    return y;
+stop

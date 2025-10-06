@@ -1,0 +1,10 @@
+func hello(): string
+start
+     return "Hello" + " World\n";
+stop
+
+func main(): int 
+start
+     write(hello());
+     return 0;
+stop

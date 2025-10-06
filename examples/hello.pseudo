@@ -1,5 +1,5 @@
 func main(): int
 start
-    write("Hello, World\n");
+    write("Hello world\n");
     return 0;
 stop

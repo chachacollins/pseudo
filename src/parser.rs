@@ -63,19 +63,6 @@ pub enum Type {
     Unknown,
 }
 
-impl std::fmt::Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Type::Nat => write!(f, "uint32_t"),
-            Type::String => write!(f, "char*"),
-            Type::Int => write!(f, "int32_t"),
-            Type::Bool => write!(f, "bool"),
-            Type::Void => write!(f, "void"),
-            Type::Unknown => unreachable!(),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Param {
     pub param_type: Type,
@@ -320,6 +307,7 @@ impl Parser {
             match token.kind {
                 TokenKind::Int => Type::Int,
                 TokenKind::Nat => Type::Nat,
+                TokenKind::Str => Type::String,
                 _ => {
                     compiler_error!(token, format!("unknown type \"{}\"", token.kind));
                     unreachable!();

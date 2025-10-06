@@ -38,6 +38,7 @@ pub enum TokenKind {
     //Types
     Int,
     Nat,
+    Str,
 
     Number(String),
     String(String),
@@ -80,6 +81,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Return => write!(f, "return"),
             TokenKind::Int => write!(f, "int"),
             TokenKind::Nat => write!(f, "nat"),
+            TokenKind::Str => write!(f, "string"),
             TokenKind::Number(num) => write!(f, "number \"{num}\""),
             TokenKind::String(string) => write!(f, "string \"{string}\""),
             TokenKind::Ident(string) => write!(f, "identifier \"{string}\""),
@@ -181,6 +183,7 @@ impl Lexer {
         match ident {
             "start" => TokenKind::Start,
             "stop" => TokenKind::Stop,
+            "string" => TokenKind::Str,
             "set" => TokenKind::Set,
             "mut" => TokenKind::Mut,
             "func" => TokenKind::Func,

@@ -3,17 +3,22 @@ use std::fmt::{self, Write};
 
 pub struct CodeGen {
     sink: String,
+    is_main: bool,
 }
 
 impl CodeGen {
     pub fn new() -> Self {
         Self {
             sink: String::new(),
+            is_main: false,
         }
     }
+
     fn generate_prelude(self: &mut Self) -> fmt::Result {
         writeln!(self.sink, "#include <stdio.h>")?;
         writeln!(self.sink, "#include <stdint.h>")?;
+        writeln!(self.sink, "#include <pseudo.h>")?;
+        writeln!(self.sink, "static tgc_t gc;")?;
         Ok(())
     }
 
@@ -26,7 +31,7 @@ impl CodeGen {
                 format!("\"%u\", {cvalue}")
             }
             CType::String => {
-                format!("\"%s\", {cvalue}")
+                format!("\"%s\", {cvalue}.str")
             }
         };
         writeln!(self.sink, "printf({write_value});")?;
@@ -34,6 +39,9 @@ impl CodeGen {
     }
 
     fn generate_return_stmt(self: &mut Self, cvalue: &CValue) -> fmt::Result {
+        if self.is_main {
+            writeln!(self.sink, "tgc_stop(&gc);")?;
+        }
         writeln!(self.sink, "return {cvalue};")?;
         Ok(())
     }
@@ -45,17 +53,23 @@ impl CodeGen {
         return_type: &CType,
         stmts: Vec<Cir>,
     ) -> fmt::Result {
+        self.is_main = &name == "main";
         write!(self.sink, "{return_type} {name}")?;
 
-        write!(self.sink, "(")?;
-        let param_strings: Vec<String> = cparams
-            .iter()
-            .map(|param| format!("{} {}", param.param_type, param.name))
-            .collect();
-        write!(self.sink, "{}", param_strings.join(", "))?;
-        write!(self.sink, ")")?;
+        if self.is_main {
+            write!(self.sink, "(int argc, char** argv)")?;
+        } else {
+            let param_strings: Vec<String> = cparams
+                .iter()
+                .map(|param| format!("{} {}", param.param_type, param.name))
+                .collect();
+            write!(self.sink, "({})", param_strings.join(", "))?;
+        }
 
         writeln!(self.sink, "{{")?;
+        if self.is_main {
+            writeln!(self.sink, "tgc_start(&gc, &argc);")?;
+        }
         self.generate_stmts(stmts)?;
         writeln!(self.sink, "}}")?;
         Ok(())
