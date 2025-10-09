@@ -63,8 +63,6 @@ fn compile_c_code(ctx: CompilerCtx) {
         .args(args)
         .output()
         .expect("Failed to compile the c program {c_filename}");
-    println!("{}", ctx.c_file_path);
-    println!("{}", ctx.output_path);
     if !output.status.success() {
         compiler_error(&format!("{}", String::from_utf8_lossy(&output.stderr)));
     }
