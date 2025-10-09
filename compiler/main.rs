@@ -120,7 +120,6 @@ fn main() {
     if output_file_path.is_none() {
         output_file_path = Some(get_output_path(input_file_path));
     }
-    println!("{}", output_file_path.as_ref().unwrap());
     let source = match fs::read_to_string(input_file_path) {
         Ok(contents) => contents,
         Err(err) => cli_error(&format!("could not open file: {input_file_path} {err}")),
