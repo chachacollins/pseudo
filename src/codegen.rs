@@ -23,18 +23,18 @@ impl CodeGen {
     }
 
     fn generate_write_stmt(self: &mut Self, ctype: &CType, cvalue: &CValue) -> fmt::Result {
-        let write_value = match ctype {
+        let print_func = match ctype {
             CType::Int => {
-                format!("\"%d\", {cvalue}")
+                format!("print_int({cvalue})")
             }
             CType::Uint => {
-                format!("\"%u\", {cvalue}")
+                format!("print_uint({cvalue})")
             }
             CType::String => {
-                format!("\"%s\", {cvalue}.str")
+                format!("print_str(&{cvalue})")
             }
         };
-        writeln!(self.sink, "printf({write_value});")?;
+        writeln!(self.sink, "{print_func};")?;
         Ok(())
     }
 
