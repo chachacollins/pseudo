@@ -71,6 +71,19 @@ fn compile_c_code(ctx: CompilerCtx) {
     }
 }
 
+fn get_output_path(input_file_path: &str) -> String {
+    let mut acc = Vec::new();
+    input_file_path.split("/").for_each(|s| acc.push(s));
+    let last = acc
+        .pop()
+        .unwrap()
+        .split(".")
+        .next()
+        .unwrap_or_else(|| cli_error("file doesn't have .pseudo extension"));
+    acc.push(last);
+    return acc.join("/");
+}
+
 fn main() {
     let args = env::args().skip(1).collect::<Vec<String>>();
 
@@ -103,16 +116,11 @@ fn main() {
             }
         }
     }
-    //TODO: Check file extension
+    //TODO: Actually process the file path
     if output_file_path.is_none() {
-        output_file_path = Some(
-            input_file_path
-                .split('.')
-                .next()
-                .unwrap_or_else(|| cli_error("use the .pseudo extension"))
-                .to_string(),
-        );
+        output_file_path = Some(get_output_path(input_file_path));
     }
+    println!("{}", output_file_path.as_ref().unwrap());
     let source = match fs::read_to_string(input_file_path) {
         Ok(contents) => contents,
         Err(err) => cli_error(&format!("could not open file: {input_file_path} {err}")),

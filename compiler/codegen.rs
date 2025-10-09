@@ -31,7 +31,7 @@ impl CodeGen {
                 format!("print_uint({cvalue})")
             }
             CType::String => {
-                format!("print_str(&{cvalue})")
+                format!("print_str({cvalue})")
             }
         };
         writeln!(self.sink, "{print_func};")?;

@@ -3,4 +3,13 @@ name = "pseudo"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "pseudo"
+path  = "compiler/main.rs"
+
+[[bin]]
+name = "tester"
+path  = "tools/tester.rs"
+
 [dependencies]
+
