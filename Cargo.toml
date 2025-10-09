@@ -11,5 +11,9 @@ path  = "compiler/main.rs"
 name = "tester"
 path  = "tools/tester.rs"
 
+[[bin]]
+name = "cleaner"
+path  = "tools/cleaner.rs"
+
 [dependencies]
 
