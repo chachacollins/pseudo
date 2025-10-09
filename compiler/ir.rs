@@ -41,31 +41,27 @@ impl fmt::Display for CValue {
             CValue::StringLiteral(s) => write!(f, "StrLit(\"{}\")", s),
             CValue::Variable(name) => write!(f, "{}", name),
             CValue::Temporary(id) => write!(f, "__tmp_{}", id),
-            CValue::BinaryOp(lhs, op, rhs) => {
-                match &**lhs {
-                    CValue::StringLiteral(_) => {
-                        match op {
-                            Op::Add => write!(f, "string_concat(&gc, &{lhs}, &{rhs})"),
-                            _ => unreachable!(),
-                        }
+            CValue::BinaryOp(lhs, op, rhs) => match &**lhs {
+                CValue::StringLiteral(_) => match op {
+                    Op::Add => write!(f, "string_concat(&gc, &{lhs}, &{rhs})"),
+                    _ => unreachable!(),
+                },
+                _ => {
+                    write!(f, "{lhs} ")?;
+                    match op {
+                        Op::Add => write!(f, "+")?,
+                        Op::Minus => write!(f, "-")?,
+                        Op::Mult => write!(f, "*")?,
+                        Op::Div => write!(f, "/")?,
+                        Op::Mod => write!(f, "%")?,
+                        Op::Equal => write!(f, "==")?,
+                        Op::NotEqual => write!(f, "!=")?,
+                        Op::And => write!(f, "&&")?,
+                        Op::Or => write!(f, "||")?,
                     }
-                    _ => { 
-                        write!(f, "{lhs} ")?;
-                        match op {
-                            Op::Add => write!(f, "+")?,
-                            Op::Minus => write!(f, "-")?,
-                            Op::Mult => write!(f, "*")?,
-                            Op::Div => write!(f, "/")?,
-                            Op::Mod => write!(f, "%")?,
-                            Op::Equal => write!(f, "==")?,
-                            Op::NotEqual => write!(f, "!=")?,
-                            Op::And => write!(f, "&&")?,
-                            Op::Or => write!(f, "||")?,
-                        }
-                        write!(f, " {rhs}")
-                    }
+                    write!(f, " {rhs}")
                 }
-            }
+            },
             CValue::SubProgCall(name, args) => {
                 write!(
                     f,
