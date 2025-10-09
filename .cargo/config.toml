@@ -1,3 +1,7 @@
+[alias] 
+pseudo = ["run", "--bin", "pseudo", "--"]
+tester = ["run", "--release", "--bin", "tester",  "--", "./examples"]
+
 [env]
 LIBPSEUDO="/home/alchemist/Desktop/ada/libpseudo"
 
