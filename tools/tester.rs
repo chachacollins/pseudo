@@ -24,7 +24,7 @@ fn main() -> io::Result<()> {
                     eprint!("\rRunning test: {i} file: {file_path}                           ");
                     i += 1;
                     let output = Command::new("cargo")
-                        .args(["pseudo", file_path])
+                        .args(["pseudo", file_path, "--keep"])
                         .output()
                         .expect("Failed to run cargo pseudo command");
                     if !output.status.success() {
