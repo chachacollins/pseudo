@@ -5,11 +5,11 @@ edition = "2024"
 
 [[bin]]
 name = "pseudo"
-path  = "src/main.rs"
+path  = "compiler/main.rs"
 
 [[bin]]
 name = "tester"
-path  = "tester/main.rs"
+path  = "tools/tester.rs"
 
 [dependencies]
 
