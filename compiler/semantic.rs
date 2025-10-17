@@ -165,6 +165,17 @@ impl SemanticAnalyzer {
                     todo!()
                 }
             }
+            Expr::Bool(_) =>  {
+                if expected_type == Type::Bool || expected_type == Type::Unknown {
+                    Type::Bool
+                } else {
+                    self.errors.push(SemError {
+                        msg: format!("Expected type {:?}, found boolean", expected_type),
+                        position: expr.position.clone(),
+                    });
+                    expected_type
+                }
+            }
             Expr::String(_) => {
                 if expected_type == Type::String || expected_type == Type::Unknown {
                     Type::String

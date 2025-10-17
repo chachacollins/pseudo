@@ -42,6 +42,7 @@ pub enum Expr {
     Number(i128),
     String(String),
     Variable(String),
+    Bool(bool),
     SubprogramCall {
         name: String,
         args: Vec<AstNode<Expr>>,
@@ -152,7 +153,6 @@ impl Parser {
         }
     }
 
-    //TODO: INVESTIGATE THIS
     pub fn parse_program(&mut self) -> Vec<AstNode<Stmts>> {
         self.parse_statements()
     }
@@ -233,6 +233,14 @@ impl Parser {
                     value: Expr::String(str.clone()),
                     position: Position::from(&token),
                 },
+                TokenKind::True => AstNode {
+                    value: Expr::Bool(true),
+                    position: Position::from(&token),
+                },
+                TokenKind::False => AstNode {
+                    value: Expr::Bool(false),
+                    position: Position::from(&token),
+                },
                 TokenKind::Ident(ref name) => {
                     if let Some(token) = self.lexer.peek() {
                         if token.kind == TokenKind::LParen {
@@ -308,6 +316,7 @@ impl Parser {
                 TokenKind::Int => Type::Int,
                 TokenKind::Nat => Type::Nat,
                 TokenKind::Str => Type::String,
+                TokenKind::Bool => Type::Bool,
                 _ => {
                     compiler_error!(token, format!("unknown type \"{}\"", token.kind));
                     unreachable!();

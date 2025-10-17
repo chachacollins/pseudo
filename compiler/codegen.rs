@@ -15,8 +15,6 @@ impl CodeGen {
     }
 
     fn generate_prelude(self: &mut Self) -> fmt::Result {
-        writeln!(self.sink, "#include <stdio.h>")?;
-        writeln!(self.sink, "#include <stdint.h>")?;
         writeln!(self.sink, "#include <pseudo.h>")?;
         writeln!(self.sink, "static tgc_t gc;")?;
         Ok(())
@@ -32,6 +30,13 @@ impl CodeGen {
             }
             CType::String => {
                 format!("print_str({cvalue})")
+            }
+            CType::Bool => {
+                format!("print_bool({cvalue})")
+            }
+            CType::Void => {
+                //TODO: Warn that you can't print void values
+                format!("void")
             }
         };
         writeln!(self.sink, "{print_func};")?;

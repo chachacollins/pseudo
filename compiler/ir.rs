@@ -6,6 +6,8 @@ pub enum CType {
     Int,
     Uint,
     String,
+    Bool,
+    Void,
 }
 
 #[derive(Debug)]
@@ -20,6 +22,8 @@ impl fmt::Display for CType {
             CType::Int => write!(f, "int32_t"),
             CType::Uint => write!(f, "unt32_t"),
             CType::String => write!(f, "string_t"),
+            CType::Bool => write!(f, "bool"),
+            CType::Void => write!(f, "void"),
         }
     }
 }
@@ -27,6 +31,7 @@ impl fmt::Display for CType {
 pub enum CValue {
     NumLiteral(i128),
     StringLiteral(String),
+    Bool(bool),
     Variable(String),
     BinaryOp(Box<CValue>, Op, Box<CValue>),
     SubProgCall(String, Vec<CValue>),
@@ -35,9 +40,10 @@ pub enum CValue {
 impl fmt::Display for CValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CValue::NumLiteral(n) => write!(f, "{}", n),
-            CValue::StringLiteral(s) => write!(f, "StrLit(\"{}\")", s),
-            CValue::Variable(name) => write!(f, "{}", name),
+            CValue::NumLiteral(n) => write!(f, "{n}"),
+            CValue::StringLiteral(s) => write!(f, "StrLit(\"{s}\")"),
+            CValue::Variable(name) => write!(f, "{name}"),
+            CValue::Bool(val) => write!(f, "{val}"),
             CValue::BinaryOp(lhs, op, rhs) => match &**lhs {
                 CValue::StringLiteral(_) => match op {
                     Op::Add => write!(f, "string_concat(&gc, &{lhs}, &{rhs})"),
@@ -106,8 +112,9 @@ impl CirGenerator {
             Type::Nat => CType::Uint,
             Type::String => CType::String,
             Type::Int => CType::Int,
+            Type::Bool => CType::Bool,
+            Type::Void => CType::Void,
             Type::Unknown => unreachable!(),
-            _ => todo!(),
         }
     }
 
@@ -116,6 +123,7 @@ impl CirGenerator {
             Expr::String(str) => CValue::StringLiteral(str),
             //TODO: Actually implement this
             Expr::Number(num) => CValue::NumLiteral(num),
+            Expr::Bool(bool_val) => CValue::Bool(bool_val),
             Expr::Binary { lhs, op, rhs } => CValue::BinaryOp(
                 Box::new(self.to_c_value(lhs.value)),
                 op,
