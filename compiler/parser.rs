@@ -116,7 +116,7 @@ pub enum Stmts {
     While {
         expr: AstNode<Expr>,
         stmts: Vec<AstNode<Stmts>>,
-    }
+    },
 }
 
 macro_rules! compiler_error {
@@ -366,7 +366,7 @@ impl Parser {
         self.get_and_expect(TokenKind::Do);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::End);
-        Stmts::While {expr, stmts}
+        Stmts::While { expr, stmts }
     }
 
     //TODO: Ensure it is within an if block
