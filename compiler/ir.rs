@@ -20,7 +20,6 @@ impl fmt::Display for CType {
             CType::Int => write!(f, "int32_t"),
             CType::Uint => write!(f, "unt32_t"),
             CType::String => write!(f, "string_t"),
-            _ => todo!(),
         }
     }
 }
@@ -29,7 +28,6 @@ pub enum CValue {
     NumLiteral(i128),
     StringLiteral(String),
     Variable(String),
-    Temporary(usize),
     BinaryOp(Box<CValue>, Op, Box<CValue>),
     SubProgCall(String, Vec<CValue>),
 }
@@ -40,7 +38,6 @@ impl fmt::Display for CValue {
             CValue::NumLiteral(n) => write!(f, "{}", n),
             CValue::StringLiteral(s) => write!(f, "StrLit(\"{}\")", s),
             CValue::Variable(name) => write!(f, "{}", name),
-            CValue::Temporary(id) => write!(f, "__tmp_{}", id),
             CValue::BinaryOp(lhs, op, rhs) => match &**lhs {
                 CValue::StringLiteral(_) => match op {
                     Op::Add => write!(f, "string_concat(&gc, &{lhs}, &{rhs})"),

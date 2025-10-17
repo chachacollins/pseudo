@@ -202,7 +202,8 @@ impl SemanticAnalyzer {
                 }
                 self.subprogram_table.get(name).unwrap().return_type
             }
-            Expr::Binary { lhs, op, rhs } => {
+            //TODO: analyze based on the operation kind
+            Expr::Binary { lhs, rhs, .. } => {
                 let mut lhs_type = expected_type;
                 let mut rhs_type = expected_type;
                 lhs_type = self.analyze_expr(lhs, lhs_type);
@@ -288,7 +289,7 @@ impl SemanticAnalyzer {
                 return_type,
                 stmts,
                 params,
-                name
+                name,
             } => {
                 if self.is_subprogram {
                     self.errors.push(SemError {
@@ -317,7 +318,7 @@ impl SemanticAnalyzer {
             Stmts::SubProgramCall { .. } => todo!(),
             Stmts::If { expr, stmts } => {
                 //TODO: check if this is type bool
-                let gotten_type = self.analyze_expr(expr, Type::Unknown);
+                let _gotten_type = self.analyze_expr(expr, Type::Unknown);
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }

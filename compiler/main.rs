@@ -41,7 +41,7 @@ struct CompilerCtx<'a> {
 }
 
 fn compile_c_code(ctx: CompilerCtx) {
-    let mut libpseudo_path;
+    let libpseudo_path;
     match env::var_os("LIBPSEUDO") {
         Some(val) => libpseudo_path = val,
         None => compiler_error("LIBPSEUDO path variable not set"),
