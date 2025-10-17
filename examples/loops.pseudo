@@ -1,0 +1,13 @@
+func main():int
+start
+     set mut i := 0;
+     while i <= 10 do
+        i = i + 1;
+        write("Hello World");
+     end
+     until i > 20 do
+        i = i + 1;
+        write("Hello World");
+     end
+     return 0;
+stop

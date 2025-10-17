@@ -18,6 +18,10 @@ pub enum TokenKind {
     Percent,
     Star,
     Walrus,
+    LessThan,
+    GreaterThan,
+    LessThanEq,
+    GreaterThanEq,
 
     //Keywords
     Func,
@@ -31,11 +35,14 @@ pub enum TokenKind {
     Else,
     End,
     Then,
+    Do,
     Or,
     Set,
     Mut,
     True,
     False,
+    While,
+    Until,
 
     //Types
     Int,
@@ -57,6 +64,10 @@ impl fmt::Display for TokenKind {
             TokenKind::Comma => write!(f, ","),
             TokenKind::Walrus => write!(f, ":="),
             TokenKind::Minus => write!(f, "-"),
+            TokenKind::LessThan => write!(f, "<"),
+            TokenKind::LessThanEq => write!(f, "<="),
+            TokenKind::GreaterThan => write!(f, ">"),
+            TokenKind::GreaterThanEq => write!(f, ">="),
             TokenKind::Star => write!(f, "*"),
             TokenKind::Percent => write!(f, "%"),
             TokenKind::Slash => write!(f, "/"),
@@ -67,6 +78,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Mut => write!(f, "mut"),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
+            TokenKind::While => write!(f, "while"),
+            TokenKind::Until => write!(f, "until"),
             TokenKind::And => write!(f, "and"),
             TokenKind::Func => write!(f, "func"),
             TokenKind::Not => write!(f, "!"),
@@ -77,6 +90,7 @@ impl fmt::Display for TokenKind {
             TokenKind::If => write!(f, "if"),
             TokenKind::Else => write!(f, "else"),
             TokenKind::Then => write!(f, "then"),
+            TokenKind::Do => write!(f, "do"),
             TokenKind::End => write!(f, "end"),
             TokenKind::Proc => write!(f, "proc"),
             TokenKind::Start => write!(f, "start"),
@@ -197,10 +211,13 @@ impl Lexer {
             "if" => TokenKind::If,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
+            "while" => TokenKind::While,
+            "until" => TokenKind::Until,
             "else" => TokenKind::Else,
             "or" => TokenKind::Or,
             "and" => TokenKind::And,
             "then" => TokenKind::Then,
+            "do" => TokenKind::Do,
             "end" => TokenKind::End,
             "int" => TokenKind::Int,
             "nat" => TokenKind::Nat,
@@ -221,6 +238,22 @@ impl Lexer {
                     self.make_token(TokenKind::Walrus, self.row, self.column)
                 } else {
                     self.make_token(TokenKind::Colon, self.row, self.column)
+                }
+            }
+            '>' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.make_token(TokenKind::GreaterThanEq, self.row, self.column)
+                } else {
+                    self.make_token(TokenKind::GreaterThan, self.row, self.column)
+                }
+            }
+            '<' => {
+                if self.peek() == '=' {
+                    self.advance();
+                    self.make_token(TokenKind::LessThanEq, self.row, self.column)
+                } else {
+                    self.make_token(TokenKind::LessThan, self.row, self.column)
                 }
             }
             ';' => self.make_token(TokenKind::Semicolon, self.row, self.column),

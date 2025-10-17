@@ -87,6 +87,13 @@ impl CodeGen {
         Ok(())
     }
 
+    fn generate_while_stmt(self: &mut Self, expr: CValue, stmts: Vec<Cir>) -> fmt::Result {
+        writeln!(self.sink, "while ({expr}) {{")?;
+        self.generate_stmts(stmts)?;
+        writeln!(self.sink, "}}")?;
+        Ok(())
+    }
+
     fn generate_set_stmt(
         self: &mut Self,
         name: String,
@@ -129,6 +136,7 @@ impl CodeGen {
                 Cir::Write(ctype, cvalue) => self.generate_write_stmt(&ctype, &cvalue)?,
                 Cir::Return(cvalue) => self.generate_return_stmt(&cvalue)?,
                 Cir::If(cvalue, stmts_cir) => self.generate_if_stmt(cvalue, stmts_cir)?,
+                Cir::While(cvalue, stmts_cir) => self.generate_while_stmt(cvalue, stmts_cir)?,
                 Cir::Else(stmts_cir) => self.generate_else_stmt(stmts_cir)?,
                 Cir::SubProgDef {
                     name,

@@ -7,7 +7,7 @@ use std::iter::Peekable;
 //TODO: Improve error messages
 //TODO: separate ast from parser
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Op {
     Equal,
     NotEqual,
@@ -18,6 +18,10 @@ pub enum Op {
     Mult,
     Mod,
     And,
+    LessThan,
+    GreaterThan,
+    LessThanEq,
+    GreaterThanEq,
 }
 
 impl Op {
@@ -32,6 +36,10 @@ impl Op {
             TokenKind::Slash => Op::Div,
             TokenKind::And => Op::And,
             TokenKind::Percent => Op::Mod,
+            TokenKind::LessThan => Op::LessThan,
+            TokenKind::LessThanEq => Op::LessThanEq,
+            TokenKind::GreaterThan => Op::GreaterThan,
+            TokenKind::GreaterThanEq => Op::GreaterThanEq,
             _ => unreachable!(),
         }
     }
@@ -104,6 +112,14 @@ pub enum Stmts {
     SubProgramCall {
         name: String,
         args: Vec<AstNode<Expr>>,
+    },
+    While {
+        expr: AstNode<Expr>,
+        stmts: Vec<AstNode<Stmts>>,
+    },
+    Until {
+        expr: AstNode<Expr>,
+        stmts: Vec<AstNode<Stmts>>,
     },
 }
 
@@ -281,6 +297,10 @@ impl Parser {
                     | TokenKind::EqualEqual
                     | TokenKind::NotEqual
                     | TokenKind::Or
+                    | TokenKind::LessThan
+                    | TokenKind::LessThanEq
+                    | TokenKind::GreaterThan
+                    | TokenKind::GreaterThanEq
                     | TokenKind::And
                     | TokenKind::Plus
                     | TokenKind::Minus
@@ -343,6 +363,22 @@ impl Parser {
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::End);
         Stmts::If { expr, stmts }
+    }
+
+    fn parse_while_stmt(&mut self) -> Stmts {
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Do);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::End);
+        Stmts::While { expr, stmts }
+    }
+
+    fn parse_until_stmt(&mut self) -> Stmts {
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Do);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::End);
+        Stmts::Until { expr, stmts }
     }
 
     //TODO: Ensure it is within an if block
@@ -548,6 +584,20 @@ impl Parser {
                     let position = Position::from(&self.curr_token());
                     statements.push(AstNode {
                         value: self.parse_set_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::While => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_while_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Until => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_until_stmt(),
                         position,
                     });
                 }

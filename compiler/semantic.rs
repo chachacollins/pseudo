@@ -296,6 +296,7 @@ impl SemanticAnalyzer {
                     }
                 }
             }
+            //TODO: Check the return statement
             Stmts::SubProgramDef {
                 return_type,
                 stmts,
@@ -320,8 +321,26 @@ impl SemanticAnalyzer {
                         },
                     );
                 }
+                let mut return_stmt_exists = false;
+                //TODO: stronger, better checks for if stmts and what not
                 for stmt in stmts.iter_mut() {
+                    if matches!(
+                        stmt.value,
+                        Stmts::Return {
+                            return_type: _,
+                            expr: _
+                        }
+                    ) {
+                        return_stmt_exists = true;
+                    }
                     self.analyze_stmt(stmt)
+                }
+                if !return_stmt_exists && self.expected_return_type != Type::Void {
+                    self.errors.push(SemError {
+                        msg: format!("subprogram {name} does not have a return statement"),
+                        position: node.position.clone(),
+                    });
+                    return;
                 }
                 self.local_var_table.clear();
                 self.is_subprogram = false;
@@ -346,6 +365,20 @@ impl SemanticAnalyzer {
                 }
             }
             Stmts::If { expr, stmts } => {
+                //TODO: check if this is type bool
+                let _gotten_type = self.analyze_expr(expr, Type::Unknown);
+                for stmt in stmts.iter_mut() {
+                    self.analyze_stmt(stmt)
+                }
+            }
+            Stmts::While { expr, stmts } => {
+                //TODO: check if this is type bool
+                let _gotten_type = self.analyze_expr(expr, Type::Unknown);
+                for stmt in stmts.iter_mut() {
+                    self.analyze_stmt(stmt)
+                }
+            }
+            Stmts::Until { expr, stmts } => {
                 //TODO: check if this is type bool
                 let _gotten_type = self.analyze_expr(expr, Type::Unknown);
                 for stmt in stmts.iter_mut() {
