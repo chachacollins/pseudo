@@ -18,6 +18,10 @@ pub enum Op {
     Mult,
     Mod,
     And,
+    LessThan,
+    GreaterThan,
+    LessThanEq,
+    GreaterThanEq,
 }
 
 impl Op {
@@ -32,6 +36,10 @@ impl Op {
             TokenKind::Slash => Op::Div,
             TokenKind::And => Op::And,
             TokenKind::Percent => Op::Mod,
+            TokenKind::LessThan => Op::LessThan,
+            TokenKind::LessThanEq => Op::LessThanEq,
+            TokenKind::GreaterThan => Op::GreaterThan,
+            TokenKind::GreaterThanEq => Op::GreaterThanEq,
             _ => unreachable!(),
         }
     }
@@ -105,6 +113,10 @@ pub enum Stmts {
         name: String,
         args: Vec<AstNode<Expr>>,
     },
+    While {
+        expr: AstNode<Expr>,
+        stmts: Vec<AstNode<Stmts>>,
+    }
 }
 
 macro_rules! compiler_error {
@@ -281,6 +293,10 @@ impl Parser {
                     | TokenKind::EqualEqual
                     | TokenKind::NotEqual
                     | TokenKind::Or
+                    | TokenKind::LessThan
+                    | TokenKind::LessThanEq
+                    | TokenKind::GreaterThan
+                    | TokenKind::GreaterThanEq
                     | TokenKind::And
                     | TokenKind::Plus
                     | TokenKind::Minus
@@ -343,6 +359,14 @@ impl Parser {
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::End);
         Stmts::If { expr, stmts }
+    }
+
+    fn parse_while_stmt(&mut self) -> Stmts {
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Do);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::End);
+        Stmts::While {expr, stmts}
     }
 
     //TODO: Ensure it is within an if block
@@ -548,6 +572,13 @@ impl Parser {
                     let position = Position::from(&self.curr_token());
                     statements.push(AstNode {
                         value: self.parse_set_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::While => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_while_stmt(),
                         position,
                     });
                 }

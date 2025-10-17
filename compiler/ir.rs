@@ -61,6 +61,10 @@ impl fmt::Display for CValue {
                         Op::NotEqual => write!(f, "!=")?,
                         Op::And => write!(f, "&&")?,
                         Op::Or => write!(f, "||")?,
+                        Op::LessThan => write!(f, "<")?,
+                        Op::LessThanEq => write!(f, "<=")?,
+                        Op::GreaterThan => write!(f, ">")?,
+                        Op::GreaterThanEq => write!(f, ">=")?,
                     }
                     write!(f, " {rhs}")
                 }
@@ -91,6 +95,7 @@ pub enum Cir {
     },
     SubProgramCall(String, Vec<CValue>),
     If(CValue, Vec<Cir>),
+    While(CValue, Vec<Cir>),
     Else(Vec<Cir>),
     VariableDef(String, CType, CValue, bool),
     VarAssign(String, CValue),
@@ -183,6 +188,14 @@ impl CirGenerator {
                     stmts_cir.push(self.generate_stmt_cir(stmt));
                 }
                 Cir::If(cvalue, stmts_cir)
+            }
+            Stmts::While { expr, stmts } => {
+                let cvalue = self.to_c_value(expr.value);
+                let mut stmts_cir = Vec::new();
+                for stmt in stmts {
+                    stmts_cir.push(self.generate_stmt_cir(stmt));
+                }
+                Cir::While(cvalue, stmts_cir)
             }
             Stmts::Set {
                 name,
