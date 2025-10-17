@@ -5,5 +5,9 @@ start
         i = i + 1;
         write("Hello World");
      end
+     until i > 20 do
+        i = i + 1;
+        write("Hello World");
+     end
      return 0;
 stop

@@ -27,7 +27,7 @@ impl fmt::Display for CType {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CValue {
     NumLiteral(i128),
     StringLiteral(String),
@@ -145,6 +145,21 @@ impl CirGenerator {
             }
         }
     }
+
+    fn invert_cvalue(self: &Self, cvalue: &mut CValue) -> CValue {
+        match cvalue {
+            CValue::BinaryOp(_lhs, op, _rhs) => match op {
+                Op::LessThan => *op = Op::GreaterThan,
+                Op::LessThanEq => *op = Op::GreaterThanEq,
+                Op::GreaterThan => *op = Op::LessThan,
+                Op::GreaterThanEq => *op = Op::LessThanEq,
+                _ => {}
+            },
+            _ => {}
+        }
+        cvalue.clone()
+    }
+
     fn generate_stmt_cir(self: &Self, node: AstNode<Stmts>) -> Cir {
         match node.value {
             Stmts::Write { type_, expr } => {
@@ -191,6 +206,15 @@ impl CirGenerator {
             }
             Stmts::While { expr, stmts } => {
                 let cvalue = self.to_c_value(expr.value);
+                let mut stmts_cir = Vec::new();
+                for stmt in stmts {
+                    stmts_cir.push(self.generate_stmt_cir(stmt));
+                }
+                Cir::While(cvalue, stmts_cir)
+            }
+            Stmts::Until { expr, stmts } => {
+                let mut cvalue = self.to_c_value(expr.value);
+                let cvalue = self.invert_cvalue(&mut cvalue);
                 let mut stmts_cir = Vec::new();
                 for stmt in stmts {
                     stmts_cir.push(self.generate_stmt_cir(stmt));

@@ -378,6 +378,13 @@ impl SemanticAnalyzer {
                     self.analyze_stmt(stmt)
                 }
             }
+            Stmts::Until { expr, stmts } => {
+                //TODO: check if this is type bool
+                let _gotten_type = self.analyze_expr(expr, Type::Unknown);
+                for stmt in stmts.iter_mut() {
+                    self.analyze_stmt(stmt)
+                }
+            }
             //TODO: ensure it is within an if
             Stmts::Else(stmts) => {
                 for stmt in stmts.iter_mut() {

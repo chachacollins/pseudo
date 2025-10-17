@@ -42,6 +42,7 @@ pub enum TokenKind {
     True,
     False,
     While,
+    Until,
 
     //Types
     Int,
@@ -78,6 +79,7 @@ impl fmt::Display for TokenKind {
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
             TokenKind::While => write!(f, "while"),
+            TokenKind::Until => write!(f, "until"),
             TokenKind::And => write!(f, "and"),
             TokenKind::Func => write!(f, "func"),
             TokenKind::Not => write!(f, "!"),
@@ -210,6 +212,7 @@ impl Lexer {
             "true" => TokenKind::True,
             "false" => TokenKind::False,
             "while" => TokenKind::While,
+            "until" => TokenKind::Until,
             "else" => TokenKind::Else,
             "or" => TokenKind::Or,
             "and" => TokenKind::And,

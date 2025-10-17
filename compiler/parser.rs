@@ -7,7 +7,7 @@ use std::iter::Peekable;
 //TODO: Improve error messages
 //TODO: separate ast from parser
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Op {
     Equal,
     NotEqual,
@@ -114,6 +114,10 @@ pub enum Stmts {
         args: Vec<AstNode<Expr>>,
     },
     While {
+        expr: AstNode<Expr>,
+        stmts: Vec<AstNode<Stmts>>,
+    },
+    Until {
         expr: AstNode<Expr>,
         stmts: Vec<AstNode<Stmts>>,
     },
@@ -369,6 +373,14 @@ impl Parser {
         Stmts::While { expr, stmts }
     }
 
+    fn parse_until_stmt(&mut self) -> Stmts {
+        let expr = self.parse_expression();
+        self.get_and_expect(TokenKind::Do);
+        let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::End);
+        Stmts::Until { expr, stmts }
+    }
+
     //TODO: Ensure it is within an if block
     fn parse_else_stmt(&mut self) -> Stmts {
         let stmts = self.parse_statements();
@@ -579,6 +591,13 @@ impl Parser {
                     let position = Position::from(&self.curr_token());
                     statements.push(AstNode {
                         value: self.parse_while_stmt(),
+                        position,
+                    });
+                }
+                TokenKind::Until => {
+                    let position = Position::from(&self.curr_token());
+                    statements.push(AstNode {
+                        value: self.parse_until_stmt(),
                         position,
                     });
                 }
