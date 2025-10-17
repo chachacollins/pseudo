@@ -288,8 +288,16 @@ impl SemanticAnalyzer {
                 return_type,
                 stmts,
                 params,
-                ..
+                name
             } => {
+                if self.is_subprogram {
+                    self.errors.push(SemError {
+                        msg: format!("Cannot define subprogram {name} inside another subprogram"),
+                        position: node.position.clone(),
+                    });
+                    return;
+                }
+                self.is_subprogram = true;
                 self.expected_return_type = *return_type;
                 for param in params {
                     self.local_var_table.insert(
@@ -304,6 +312,7 @@ impl SemanticAnalyzer {
                     self.analyze_stmt(stmt)
                 }
                 self.local_var_table.clear();
+                self.is_subprogram = false;
             }
             Stmts::SubProgramCall { .. } => todo!(),
             Stmts::If { expr, stmts } => {
