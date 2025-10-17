@@ -165,7 +165,7 @@ impl SemanticAnalyzer {
                     todo!()
                 }
             }
-            Expr::Bool(_) =>  {
+            Expr::Bool(_) => {
                 if expected_type == Type::Bool || expected_type == Type::Unknown {
                     Type::Bool
                 } else {
@@ -326,7 +326,25 @@ impl SemanticAnalyzer {
                 self.local_var_table.clear();
                 self.is_subprogram = false;
             }
-            Stmts::SubProgramCall { .. } => todo!(),
+            Stmts::SubProgramCall { name, args } => {
+                if !self.subprogram_table.contains_key(name) {
+                    self.errors.push(SemError {
+                        msg: format!("subprogram {name} is not defined"),
+                        position: node.position.clone(),
+                    });
+                    return;
+                }
+                let arg_types = self.subprogram_table.get(name).unwrap().param_types.clone();
+                for (i, arg) in args.iter().enumerate() {
+                    let _ = self.analyze_expr(arg, arg_types[i]);
+                }
+                if self.subprogram_table.get(name).unwrap().return_type != Type::Void {
+                    self.errors.push(SemError {
+                        msg: format!("subprogram {name} returns a value which is not used"),
+                        position: node.position.clone(),
+                    });
+                }
+            }
             Stmts::If { expr, stmts } => {
                 //TODO: check if this is type bool
                 let _gotten_type = self.analyze_expr(expr, Type::Unknown);

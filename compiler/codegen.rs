@@ -101,6 +101,16 @@ impl CodeGen {
         Ok(())
     }
 
+    fn generate_subprogcall_stmt(self: &mut Self, name: String, args: Vec<CValue>) -> fmt::Result {
+        let args_str = args
+            .iter()
+            .map(|arg| arg.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+        writeln!(self.sink, "{name}({args_str});")?;
+        Ok(())
+    }
+
     fn generate_varassign_stmt(self: &mut Self, name: String, expr: CValue) -> fmt::Result {
         writeln!(self.sink, "{name} = {expr};")?;
         Ok(())
@@ -133,6 +143,7 @@ impl CodeGen {
                         stmts_cir,
                     )?;
                 }
+                Cir::SubProgramCall(name, args) => self.generate_subprogcall_stmt(name, args)?,
                 Cir::VariableDef(name, var_type, cvalue, mutable) => {
                     self.generate_set_stmt(name, var_type, cvalue, mutable)?
                 }
@@ -148,16 +159,3 @@ impl CodeGen {
         Ok(self.sink.clone())
     }
 }
-
-// fn generate_subprogcall_stmt(sink: &mut impl Write, name: String, args: Vec<Expr>) -> fmt::Result {
-//     let args_str = args
-//         .iter()
-//         .map(|arg| arg.to_string())
-//         .collect::<Vec<String>>()
-//         .join(", ");
-//     writeln!(sink, "{name}({args_str});")?;
-//     Ok(())
-// }
-//
-//
-//

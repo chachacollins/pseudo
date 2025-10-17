@@ -89,6 +89,7 @@ pub enum Cir {
         return_type: CType,
         stmts_cir: Vec<Cir>,
     },
+    SubProgramCall(String, Vec<CValue>),
     If(CValue, Vec<Cir>),
     Else(Vec<Cir>),
     VariableDef(String, CType, CValue, bool),
@@ -204,7 +205,13 @@ impl CirGenerator {
                 }
                 Cir::Else(stmts_cir)
             }
-            Stmts::SubProgramCall { .. } => todo!(),
+            Stmts::SubProgramCall { name, args } => {
+                let mut cvalues = Vec::new();
+                for arg in args {
+                    cvalues.push(self.to_c_value(arg.value));
+                }
+                Cir::SubProgramCall(name, cvalues)
+            }
         }
     }
 }

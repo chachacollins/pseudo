@@ -1,0 +1,17 @@
+func add(x: int, y: int): int 
+start
+     return x + y;
+stop
+
+proc hello()
+start
+    write("Hello World\n");
+stop
+
+func main(): int
+start
+     hello();
+     set x := add(10, 100);
+     write(x);
+     return 0;
+stop
