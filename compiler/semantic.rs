@@ -56,7 +56,8 @@ impl SemanticAnalyzer {
 
     #[inline]
     fn end_block(self: &mut Self) {
-        self.local_var_table.retain(|_, ctx| ctx.decl_level < self.decl_level );
+        self.local_var_table
+            .retain(|_, ctx| ctx.decl_level < self.decl_level);
         self.decl_level -= 1;
     }
 

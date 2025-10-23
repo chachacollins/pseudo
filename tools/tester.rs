@@ -9,7 +9,6 @@ enum LogLevel {
     Error,
 }
 
-
 fn pretty_print(msg: &str, level: LogLevel) {
     const GREEN: &str = "\x1b[32m";
     const RED: &str = "\x1b[31m";
