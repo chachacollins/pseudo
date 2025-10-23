@@ -6,9 +6,11 @@ struct SubProgCtx {
     return_type: Type,
 }
 
+#[derive(Debug)]
 struct VarCtx {
     var_type: Type,
     mutable: bool,
+    decl_level: usize,
 }
 
 struct SemError {
@@ -32,6 +34,7 @@ pub struct SemanticAnalyzer {
     subprogram_table: HashMap<String, SubProgCtx>,
     local_var_table: HashMap<String, VarCtx>,
     errors: Vec<SemError>,
+    decl_level: usize,
 }
 
 impl SemanticAnalyzer {
@@ -42,8 +45,21 @@ impl SemanticAnalyzer {
             subprogram_table: HashMap::new(),
             local_var_table: HashMap::new(),
             errors: Vec::new(),
+            decl_level: 0,
         }
     }
+
+    #[inline]
+    fn begin_block(self: &mut Self) {
+        self.decl_level += 1;
+    }
+
+    #[inline]
+    fn end_block(self: &mut Self) {
+        self.local_var_table.retain(|_, ctx| ctx.decl_level < self.decl_level );
+        self.decl_level -= 1;
+    }
+
     pub fn analyze_ast(self: &mut Self, ast: &mut [AstNode<Stmts>]) {
         for node in ast.iter_mut() {
             match &node.value {
@@ -261,10 +277,13 @@ impl SemanticAnalyzer {
                 mutable,
             } => {
                 if self.local_var_table.contains_key(name) {
-                    self.errors.push(SemError {
-                        msg: format!("redefinition of variable {name}",),
-                        position: node.position.clone(),
-                    });
+                    let var_ctx = self.local_var_table.get(name).unwrap();
+                    if var_ctx.decl_level == self.decl_level {
+                        self.errors.push(SemError {
+                            msg: format!("redefinition of variable {name}",),
+                            position: node.position.clone(),
+                        });
+                    }
                 }
                 let gotten_type = self.analyze_expr(expr, var_type.clone());
                 *var_type = gotten_type;
@@ -273,6 +292,7 @@ impl SemanticAnalyzer {
                     VarCtx {
                         var_type: var_type.clone(),
                         mutable: mutable.clone(),
+                        decl_level: self.decl_level,
                     },
                 );
             }
@@ -318,11 +338,13 @@ impl SemanticAnalyzer {
                         VarCtx {
                             var_type: param.param_type,
                             mutable: false,
+                            decl_level: 0, // will be destroyed when the function exits
                         },
                     );
                 }
                 let mut return_stmt_exists = false;
                 //TODO: stronger, better checks for if stmts and what not
+                self.begin_block();
                 for stmt in stmts.iter_mut() {
                     if matches!(
                         stmt.value,
@@ -335,6 +357,7 @@ impl SemanticAnalyzer {
                     }
                     self.analyze_stmt(stmt)
                 }
+                self.end_block();
                 if !return_stmt_exists && self.expected_return_type != Type::Void {
                     self.errors.push(SemError {
                         msg: format!("subprogram {name} does not have a return statement"),
@@ -342,7 +365,6 @@ impl SemanticAnalyzer {
                     });
                     return;
                 }
-                self.local_var_table.clear();
                 self.is_subprogram = false;
             }
             Stmts::SubProgramCall { name, args } => {
@@ -366,27 +388,35 @@ impl SemanticAnalyzer {
             }
             Stmts::If { expr, stmts } => {
                 //TODO: check if this is type bool
+                self.begin_block();
                 let _gotten_type = self.analyze_expr(expr, Type::Unknown);
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
+                self.end_block();
             }
             Stmts::While { expr, stmts } => {
                 //TODO: check if this is type bool
+                self.begin_block();
                 let _gotten_type = self.analyze_expr(expr, Type::Unknown);
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
+                self.end_block();
             }
             Stmts::Until { expr, stmts } => {
                 //TODO: check if this is type bool
+                self.begin_block();
                 let _gotten_type = self.analyze_expr(expr, Type::Unknown);
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
+                self.end_block();
             }
             //TODO: ensure it is within an if
             Stmts::Else(stmts) => {
+                self.end_block();
+                self.begin_block();
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
