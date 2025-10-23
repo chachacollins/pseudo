@@ -2,10 +2,13 @@ use std::path::Path;
 use std::process::Command;
 use std::{env, fs, io};
 
+const HIDE_CURSOR: &str = "\x1b[?25l";
+const UNHIDE_CURSOR: &str = "\x1b[?25h";
 enum LogLevel {
     Success,
     Error,
 }
+
 
 fn pretty_print(msg: &str, level: LogLevel) {
     const GREEN: &str = "\x1b[32m";
@@ -40,6 +43,7 @@ fn run_test(file_path: &str) {
             &format!("{}", String::from_utf8_lossy(&output.stderr)),
             LogLevel::Error,
         );
+        eprint!("{UNHIDE_CURSOR}");
         std::process::exit(1);
     }
     let executable_path = get_output_path(file_path);
@@ -57,6 +61,7 @@ fn run_test(file_path: &str) {
             &format!("{}", String::from_utf8_lossy(&output.stderr)),
             LogLevel::Error,
         );
+        eprint!("{UNHIDE_CURSOR}");
         std::process::exit(1);
     }
 }
@@ -65,11 +70,10 @@ fn main() -> io::Result<()> {
     let args = env::args().collect::<Vec<String>>();
     if args.len() < 2 {
         eprintln!("Pass the folder to run the tests from");
+        eprint!("{UNHIDE_CURSOR}");
         std::process::exit(1);
     }
 
-    const HIDE_CURSOR: &str = "\x1b[?25l";
-    const UNHIDE_CURSOR: &str = "\x1b[?25h";
     eprint!("{HIDE_CURSOR}");
     let mut i = 1;
     let dir_path = &args[1];
