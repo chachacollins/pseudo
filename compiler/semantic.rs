@@ -290,7 +290,7 @@ impl SemanticAnalyzer {
                         let _ = self.analyze_expr(expr, var_ctx.var_type);
                     } else {
                         self.errors.push(SemError {
-                            msg: format!("trying to assing value to immutable variable: {name}",),
+                            msg: format!("trying to assign value to immutable variable: {name}",),
                             position: node.position.clone(),
                         });
                     }
