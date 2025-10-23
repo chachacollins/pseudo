@@ -146,7 +146,7 @@ impl CirGenerator {
         }
     }
 
-    fn invert_cvalue(self: &Self, cvalue: &mut CValue) -> CValue {
+    fn invert_cvalue(self: &Self, cvalue: &mut CValue) {
         match cvalue {
             CValue::BinaryOp(_lhs, op, _rhs) => match op {
                 Op::LessThan => *op = Op::GreaterThan,
@@ -157,7 +157,6 @@ impl CirGenerator {
             },
             _ => {}
         }
-        cvalue.clone()
     }
 
     fn generate_stmt_cir(self: &Self, node: AstNode<Stmts>) -> Cir {
@@ -214,7 +213,7 @@ impl CirGenerator {
             }
             Stmts::Until { expr, stmts } => {
                 let mut cvalue = self.to_c_value(expr.value);
-                let cvalue = self.invert_cvalue(&mut cvalue);
+                self.invert_cvalue(&mut cvalue);
                 let mut stmts_cir = Vec::new();
                 for stmt in stmts {
                     stmts_cir.push(self.generate_stmt_cir(stmt));
