@@ -1,9 +1,24 @@
 use std::path::Path;
 use std::process::Command;
 use std::{env, fs, io};
+use std::ffi::c_int;
 
 const HIDE_CURSOR: &str = "\x1b[?25l";
-const UNHIDE_CURSOR: &str = "\x1b[?25h";
+unsafe extern "C" {
+    fn printf(fmt: *const u8, ...) -> c_int;
+}
+
+//This function unhides the cursor when we exit
+extern "C" fn clean_up() {
+    unsafe {
+        printf(b"\x1b[?25h\0".as_ptr());
+    }
+}
+
+#[used]
+#[unsafe(link_section=".fini_array")]
+static _DESTRUCTOR: [extern "C" fn(); 1] = [clean_up];
+
 enum LogLevel {
     Success,
     Error,
@@ -42,7 +57,6 @@ fn run_test(file_path: &str) {
             &format!("{}", String::from_utf8_lossy(&output.stderr)),
             LogLevel::Error,
         );
-        eprint!("{UNHIDE_CURSOR}");
         std::process::exit(1);
     }
     let executable_path = get_output_path(file_path);
@@ -60,7 +74,6 @@ fn run_test(file_path: &str) {
             &format!("{}", String::from_utf8_lossy(&output.stderr)),
             LogLevel::Error,
         );
-        eprint!("{UNHIDE_CURSOR}");
         std::process::exit(1);
     }
 }
@@ -69,7 +82,6 @@ fn main() -> io::Result<()> {
     let args = env::args().collect::<Vec<String>>();
     if args.len() < 2 {
         eprintln!("Pass the folder to run the tests from");
-        eprint!("{UNHIDE_CURSOR}");
         std::process::exit(1);
     }
 
@@ -97,6 +109,5 @@ fn main() -> io::Result<()> {
         }
     }
     pretty_print("\rDone! All tests passed succesfully!", LogLevel::Success);
-    eprint!("{UNHIDE_CURSOR}");
     Ok(())
 }
