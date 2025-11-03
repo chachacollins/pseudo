@@ -35,7 +35,7 @@ impl CodeGen {
                 format!("print_bool({cvalue})")
             }
             CType::Void => {
-                //TODO: Warn that you can't print void values
+                //TODO: Warn that you cannot print void values
                 format!("void")
             }
         };
@@ -124,9 +124,9 @@ impl CodeGen {
     }
 
     fn generate_else_stmt(self: &mut Self, stmts: Vec<Cir>) -> fmt::Result {
-        writeln!(self.sink, "}}")?;
         writeln!(self.sink, "else {{")?;
         self.generate_stmts(stmts)?;
+        writeln!(self.sink, "}}")?;
         Ok(())
     }
 

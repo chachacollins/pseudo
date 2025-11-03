@@ -159,6 +159,7 @@ pub struct AstNode<T> {
 pub struct Parser {
     lexer: Peekable<Lexer>,
     curr_token: Option<Token>,
+    restore_token: Option<Token>,
 }
 
 impl Parser {
@@ -166,6 +167,7 @@ impl Parser {
         Self {
             lexer: lexer.peekable(),
             curr_token: None,
+            restore_token: None,
         }
     }
 
@@ -361,7 +363,9 @@ impl Parser {
         let expr = self.parse_expression();
         self.get_and_expect(TokenKind::Then);
         let stmts = self.parse_statements();
-        self.get_and_expect(TokenKind::End);
+        if !self.get_maybe(TokenKind::Else) {
+            self.get_and_expect(TokenKind::End);
+        }
         Stmts::If { expr, stmts }
     }
 
@@ -384,6 +388,7 @@ impl Parser {
     //TODO: Ensure it is within an if block
     fn parse_else_stmt(&mut self) -> Stmts {
         let stmts = self.parse_statements();
+        self.get_and_expect(TokenKind::End);
         Stmts::Else(stmts)
     }
 
@@ -470,11 +475,6 @@ impl Parser {
         self.get_and_expect(TokenKind::Start);
         let stmts = self.parse_statements();
         self.get_and_expect(TokenKind::Stop);
-        //TODO: Check return value
-        // let has_return = stmts.iter().any(|stmt| matches!(stmt, Stmts::Return(_)));
-        // if !has_return {
-        //     compiler_error!(self.curr_token(), "each function must have a return value");
-        // }
         Stmts::SubProgramDef {
             name,
             return_type,
@@ -532,11 +532,21 @@ impl Parser {
     fn parse_statements(&mut self) -> Vec<AstNode<Stmts>> {
         let mut statements = Vec::new();
         while let Some(token) = self.lexer.peek() {
-            if token.kind == TokenKind::Stop || token.kind == TokenKind::End {
-                break;
+            match token.kind {
+                TokenKind::Stop | TokenKind::End => break,
+                TokenKind::Else => {
+                    self.restore_token = Some(token.clone());
+                    break;
+                }
+                _ => {}
             }
-            let token = self.lexer.next().unwrap();
-            self.curr_token = Some(token);
+            if self.restore_token.is_none() {
+                let token = self.lexer.next().unwrap();
+                self.curr_token = Some(token);
+            } else {
+                self.curr_token = self.restore_token.clone();
+                self.restore_token = None;
+            }
             match self.curr_token().kind {
                 TokenKind::Write => {
                     let position = Position::from(&self.curr_token());

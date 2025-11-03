@@ -416,11 +416,11 @@ impl SemanticAnalyzer {
             }
             //TODO: ensure it is within an if
             Stmts::Else(stmts) => {
-                self.end_block();
                 self.begin_block();
                 for stmt in stmts.iter_mut() {
                     self.analyze_stmt(stmt)
                 }
+                self.end_block();
             }
         }
     }
